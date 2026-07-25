@@ -266,8 +266,6 @@ keka = "Productivity"
 sevenzip = "Productivity"
 wimlib = "Productivity"
 snappy = "Productivity"
-"font-fira-code-nerd-font" = "Productivity"
-"font-meslo-lg-nerd-font" = "Productivity"
 tlrc = "Productivity"
 
 # Evaluated top to bottom; the first category whose keyword appears in a
@@ -279,7 +277,7 @@ keywords = ["security", "exploit", "vulnerab", "penetration", "malware", "antivi
 
 [[heuristic]]
 category = "AI & Machine Learning"
-keywords = ["machine learning", "language model", " llm", "artificial intelligence", "neural network", "generative ai"]
+keywords = ["machine learning", "language model", " llm", "artificial intelligence", "neural network", "generative ai", "openai", "computer vision"]
 
 [[heuristic]]
 category = "DNS"
@@ -295,7 +293,14 @@ keywords = ["network", "packet", "firewall", "vpn", "proxy", "tunnel", "load bal
 
 [[heuristic]]
 category = "Media & Graphics"
-keywords = ["video", "audio codec", "audio editor", "image editing", "image manipulat", "screen record", "transcod", "photo editing", "screenshot"]
+keywords = ["video", "audio codec", "audio editor", "image editing", "image manipulat", "screen record", "transcod", "photo editing", "screenshot", "music"]
+
+[[heuristic]]
+category = "Fonts"
+# Matched against name+desc together: most `font-*` casks (there are
+# thousands) ship with no `desc` at all, only a name that starts with
+# "font-", so the "font-" keyword below matches on the name instead.
+keywords = ["font-", "typeface", "font family"]
 
 [[heuristic]]
 category = "Documents & PDF"
@@ -315,7 +320,7 @@ keywords = ["cloud", "kubernetes", "container", "infrastructure as code", "orche
 
 [[heuristic]]
 category = "Dev Tools & Languages"
-keywords = ["compiler", "programming language", "interpreter", "build system", "version control", "package manager", "linter"]
+keywords = ["compiler", "programming language", "interpreter", "build system", "version control", "package manager", "linter", "git ", "language server"]
 
 [[heuristic]]
 category = "System Utilities"
@@ -323,7 +328,11 @@ keywords = ["clean up", "cleaner", "uninstall", "disk usage", "disk space", "win
 
 [[heuristic]]
 category = "Communication & Browsers"
-keywords = ["web browser", "chat and", "video call", "email client", "messaging app"]
+keywords = ["web browser", "chat", "video call", "email client", "messaging app"]
+
+[[heuristic]]
+category = "Games & Emulation"
+keywords = ["game", "emulat", "gaming"]
 
 [[heuristic]]
 category = "Productivity"

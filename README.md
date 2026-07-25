@@ -4,9 +4,11 @@ A small CLI/TUI tool that reads your installed [Homebrew](https://brew.sh) formu
 
 Homebrew itself has no concept of categories or tags. `lagerregal` fills that gap with:
 
-1. A curated name → category lookup for well-known packages (validated against a real-world `brew info --json=v2 --installed` dump so it actually covers what people have installed, not just a hand-picked wishlist)
-2. A keyword heuristic that scans each package's description for anything not in the curated list
+1. A curated name → category lookup for well-known packages
+2. A keyword heuristic matched against each package's name *and* description (so e.g. the thousands of `font-*` casks, which carry no description at all, still get classified from their name)
 3. Manual overrides and personal notes you set yourself, which always win
+
+Both were tuned against the full official package catalog - all ~8,500 [homebrew-core](https://github.com/Homebrew/homebrew-core) formulae and ~7,700 [homebrew-cask](https://github.com/Homebrew/homebrew-cask) casks, not just a hand-picked wishlist - as well as a real user's `brew info --json=v2 --installed` dump, to make sure it holds up against what people actually install day to day.
 
 By default, only packages you explicitly installed are shown - the dozens of C libraries Homebrew pulls in as *dependencies* of those packages are hidden (pass `--all`, or press `d` in the TUI, to include them). Everything runs locally - no network access, no API keys required.
 
@@ -66,13 +68,13 @@ Precedence, highest wins:
 3. **Keyword heuristic** - matches keywords against the package's `desc` field
 4. **Uncategorized** - fallback if nothing matched
 
-Built-in categories: Security, AI & Machine Learning, DNS, Cryptography, Networking, Media & Graphics, Documents & PDF, Monitoring, Databases, Cloud & Infra, Dev Tools & Languages, System Utilities, Communication & Browsers, Productivity. You're not limited to these - `lagerregal category <name> <anything>` accepts any category name you want.
+Built-in categories: Security, AI & Machine Learning, DNS, Cryptography, Networking, Media & Graphics, Fonts, Documents & PDF, Monitoring, Databases, Cloud & Infra, Dev Tools & Languages, System Utilities, Communication & Browsers, Games & Emulation, Productivity. You're not limited to these - `lagerregal category <name> <anything>` accepts any category name you want.
 
 Manual overrides and notes are stored locally (not the raw package data, which is always re-read live from `brew` so it stays current) at:
 
 - macOS: `~/Library/Application Support/lagerregal/state.toml`
 
-Run `lagerregal scan` any time (e.g. after `brew install`/`brew upgrade`) to see an updated category breakdown and spot newly `Uncategorized` packages worth classifying yourself. The curated list and heuristics were tuned against a real ~180-package `brew info --json=v2 --installed` dump (explicitly-installed formulae + casks), not just guessed - that run came back with 0 packages left `Uncategorized`, though your own mix of packages will vary.
+Run `lagerregal scan` any time (e.g. after `brew install`/`brew upgrade`) to see an updated category breakdown and spot newly `Uncategorized` packages worth classifying yourself. On a real user's ~180 explicitly-installed packages, tuning against their own `brew info --json=v2 --installed` dump got the classifier to 0 `Uncategorized` - though against the *entire* Homebrew catalog (~16,000 formulae + casks, most of which nobody has installed, many of them narrow single-purpose C libraries) a majority still land in `Uncategorized`. That's expected: the goal is covering what people actually install, not inventing a category for every possible library.
 
 ## Development
 

@@ -88,9 +88,13 @@ pub fn classify(
         return (cat.clone(), ClassificationSource::Curated);
     }
 
-    let desc_lower = desc.to_lowercase();
+    // Matched against name + desc together (not desc alone) so name-pattern
+    // packages with no useful description - e.g. the thousands of `font-*`
+    // casks, which carry no `desc` at all - can still be caught by keywords
+    // like "font-" without needing one curated entry per package.
+    let haystack = format!("{name} {desc}").to_lowercase();
     for h in &data.heuristic {
-        if h.keywords.iter().any(|kw| desc_lower.contains(kw.as_str())) {
+        if h.keywords.iter().any(|kw| haystack.contains(kw.as_str())) {
             return (h.category.clone(), ClassificationSource::Heuristic);
         }
     }
@@ -155,6 +159,16 @@ mod tests {
         let (cat, source) = classify("nmap", "some unrelated description", None);
         assert_eq!(cat, "Networking");
         assert_eq!(source, ClassificationSource::Curated);
+    }
+
+    #[test]
+    fn heuristic_matches_on_name_when_description_is_empty() {
+        // Homebrew's `font-*` casks (there are thousands) ship with no
+        // `desc` at all - only a name - so the heuristic must be able to
+        // match against the package name too.
+        let (cat, source) = classify("font-fira-code-nerd-font", "", None);
+        assert_eq!(cat, "Fonts");
+        assert_eq!(source, ClassificationSource::Heuristic);
     }
 
     #[test]
