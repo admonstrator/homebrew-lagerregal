@@ -4,7 +4,7 @@ A CLI and TUI for your installed [Homebrew](https://brew.sh) packages: classifie
 
 Homebrew has no concept of categories or tags. `lagerregal` fills that gap.
 
-> **Apple Silicon only.** Builds and releases target `aarch64-apple-darwin`.
+> **macOS only.** Builds and releases target both `aarch64-apple-darwin` (Apple Silicon) and `x86_64-apple-darwin` (Intel).
 
 ## Installation
 
@@ -162,11 +162,11 @@ cargo fmt
 
 Homebrew JSON parsing, classification, the cache fingerprint, and the theme's category table all run against fixtures or temp directories rather than a real `brew`, so the test suite runs anywhere Rust does. Exercising the actual `brew` shell-outs and the TUI's rendering needs a Mac with Homebrew installed.
 
-CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request.
+CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request, natively on both `aarch64-apple-darwin` (`macos-latest`) and `x86_64-apple-darwin` (`macos-15-intel` — GitHub's last Intel macOS image, retiring alongside macOS 15 support around fall 2027) so neither architecture is just assumed to work.
 
 ## Releasing
 
-Releases are cut by pushing a tag. `.github/workflows/release.yml` then builds the binary, publishes a GitHub Release, and updates the Homebrew tap:
+Releases are cut by pushing a tag. `.github/workflows/release.yml` then builds both architectures, publishes a GitHub Release with both archives, and updates the Homebrew tap:
 
 ```sh
 # bump version in Cargo.toml first, then:
@@ -174,12 +174,14 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+Both targets are built from a single Apple Silicon runner - Xcode's toolchain cross-links `x86_64-apple-darwin` from an `aarch64` host without issue, so there's no need for a second runner just to produce the release artifact (CI already validated both natively).
+
 One-time setup before the first release:
 
 1. **Create the tap repository** — a GitHub repo named `admonstrator/homebrew-lagerregal` (the `homebrew-` prefix is required by Homebrew's tap naming convention).
 2. **Add a `HOMEBREW_TAP_TOKEN` secret** to *this* repo: a GitHub personal access token with `contents: write` on the tap repo.
 
-The workflow generates `Formula/lagerregal.rb` in the tap with the release URL and its SHA-256, so `brew install lagerregal` pulls the prebuilt binary rather than compiling from source.
+The workflow generates `Formula/lagerregal.rb` in the tap with both release URLs and their SHA-256s, switching on `Hardware::CPU.arm?` - so `brew install lagerregal` pulls the right prebuilt binary for the machine it's running on rather than compiling from source.
 
 ## License
 

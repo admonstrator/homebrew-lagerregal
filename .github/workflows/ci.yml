@@ -17,9 +17,22 @@ env:
 
 jobs:
   check:
-    # Apple Silicon: the only target this project ships, so it's also the
-    # only one worth testing on.
-    runs-on: macos-latest
+    name: check (${{ matrix.target }})
+    # Both Mac architectures this project ships for, each built and tested
+    # natively (no cross-compilation, no Rosetta) so a target only counts as
+    # working once it has actually run on that hardware.
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+          - target: x86_64-apple-darwin
+            # GitHub's last Intel macOS image; retiring alongside macOS 15
+            # support (~fall 2027). Re-check actions/runner-images if this
+            # label ever stops working.
+            runner: macos-15-intel
     steps:
       - uses: actions/checkout@v4
 
@@ -33,8 +46,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.target }}-cargo-
 
       - name: Formatting
         run: cargo fmt --check
