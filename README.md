@@ -9,11 +9,11 @@ Homebrew has no concept of categories or tags. `lagerregal` fills that gap.
 ## Installation
 
 ```sh
-brew tap admonstrator/lagerregal https://github.com/admonstrator/lagerregal
+brew tap admonstrator/lagerregal
 brew install lagerregal
 ```
 
-This repo doubles as its own Homebrew tap, which is why the `tap` command takes an explicit URL - there's no separate `homebrew-lagerregal` repository to maintain.
+This repository *is* the tap: it's named `homebrew-lagerregal`, which is what `brew tap admonstrator/lagerregal` resolves to, and the generated formula lives here under `Formula/`. So there's no second repository to maintain and no access token to manage — the release workflow updates the formula with its own built-in `GITHUB_TOKEN`.
 
 Or from source:
 

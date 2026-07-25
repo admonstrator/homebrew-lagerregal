@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Classify and browse your installed Homebrew packages by category"
 license = "MIT"
-repository = "https://github.com/admonstrator/lagerregal"
+repository = "https://github.com/admonstrator/homebrew-lagerregal"
 
 [[bin]]
 name = "lagerregal"
