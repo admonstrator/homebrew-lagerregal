@@ -251,6 +251,13 @@ vivaldi = "Communication & Browsers"
 whatsapp = "Communication & Browsers"
 microsoft-auto-update = "Communication & Browsers"
 
+# --- Archives & Compression ---
+cabextract = "Archives & Compression"
+keka = "Archives & Compression"
+sevenzip = "Archives & Compression"
+wimlib = "Archives & Compression"
+snappy = "Archives & Compression"
+
 # --- Productivity ---
 tmux = "Productivity"
 tree = "Productivity"
@@ -261,11 +268,6 @@ starship = "Productivity"
 fd = "Productivity"
 calcurse = "Productivity"
 maccy = "Productivity"
-cabextract = "Productivity"
-keka = "Productivity"
-sevenzip = "Productivity"
-wimlib = "Productivity"
-snappy = "Productivity"
 tlrc = "Productivity"
 
 # Evaluated top to bottom; the first category whose keyword appears in a
@@ -286,6 +288,10 @@ keywords = ["dns", "domain name system", "name server", "nameserver", "whois"]
 [[heuristic]]
 category = "Cryptography"
 keywords = ["cryptograph", "encrypt", " tls", "ssl", "certificate", "pgp", "gpg"]
+
+[[heuristic]]
+category = "Cryptocurrency"
+keywords = ["cryptocurrency", "cryptocurrencies", "crypto wallet", "hardware wallet", "blockchain", "bitcoin", "ethereum", "litecoin", "crypto asset", "coin wallet", "digital currency", " nft "]
 
 [[heuristic]]
 category = "Networking"
@@ -333,6 +339,14 @@ keywords = ["web browser", "chat", "video call", "email client", "messaging app"
 [[heuristic]]
 category = "Games & Emulation"
 keywords = ["game", "emulat", "gaming"]
+
+[[heuristic]]
+category = "Archives & Compression"
+keywords = ["compress", "decompress", "archive utility", "archive manager", "archive format", "archiving tool", "archiv", " zip ", "unzip", "extract files", "tar file", "gzip", "lossless compress"]
+
+[[heuristic]]
+category = "Peripherals & Input"
+keywords = ["keyboard", "trackpad", "touchpad", "mouse", "gesture", "input device", "game controller", "gamepad", "joystick"]
 
 [[heuristic]]
 category = "Productivity"

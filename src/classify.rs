@@ -206,6 +206,11 @@ mod tests {
             tap: "homebrew/core".into(),
             version: "7.94".into(),
             installed_on_request: true,
+            installed_at: None,
+            dependencies: Vec::new(),
+            outdated: None,
+            unmaintained: false,
+            unmaintained_reason: None,
         };
         let dependency = Package {
             name: "libpng".into(),
@@ -215,6 +220,11 @@ mod tests {
             tap: "homebrew/core".into(),
             version: "1.6.43".into(),
             installed_on_request: false,
+            installed_at: None,
+            dependencies: Vec::new(),
+            outdated: None,
+            unmaintained: false,
+            unmaintained_reason: None,
         };
         let classified = classify_all(
             vec![on_request, dependency],
@@ -240,6 +250,11 @@ mod tests {
             tap: "homebrew/core".into(),
             version: "7.94".into(),
             installed_on_request: true,
+            installed_at: None,
+            dependencies: Vec::new(),
+            outdated: None,
+            unmaintained: false,
+            unmaintained_reason: None,
         }];
         let mut overrides = BTreeMap::new();
         overrides.insert("nmap".to_string(), "Security".to_string());

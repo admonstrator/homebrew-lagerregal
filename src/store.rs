@@ -52,17 +52,29 @@ impl State {
             .insert(name.to_string(), category.to_string());
     }
 
+    /// Clears a manual category override, letting the package fall back to
+    /// the curated/heuristic classification. Returns `false` if there was no
+    /// override to remove.
+    pub fn remove_category(&mut self, name: &str) -> bool {
+        self.categories.remove(name).is_some()
+    }
+
     pub fn set_note(&mut self, name: &str, note: &str) {
         self.notes.insert(name.to_string(), note.to_string());
     }
 }
 
-/// Path to the local state file, e.g. `~/Library/Application Support/lagerregal/state.toml`
+/// The app's local data directory, e.g. `~/Library/Application Support/lagerregal`
 /// on macOS (via the `directories` crate, which follows each platform's conventions).
-pub fn state_path() -> Result<PathBuf> {
+pub fn data_dir() -> Result<PathBuf> {
     let dirs = ProjectDirs::from("", "", "lagerregal")
         .context("could not determine a home directory for storing local state")?;
-    Ok(dirs.data_dir().join("state.toml"))
+    Ok(dirs.data_dir().to_path_buf())
+}
+
+/// Path to the local state file: `<data_dir>/state.toml`.
+pub fn state_path() -> Result<PathBuf> {
+    Ok(data_dir()?.join("state.toml"))
 }
 
 #[cfg(test)]
@@ -80,6 +92,16 @@ mod tests {
 
         assert_eq!(deserialized.categories.get("nmap").unwrap(), "Security");
         assert_eq!(deserialized.notes.get("nmap").unwrap(), "for CTF recon");
+    }
+
+    #[test]
+    fn remove_category_clears_override_and_reports_whether_one_existed() {
+        let mut state = State::default();
+        state.set_category("nmap", "Security");
+
+        assert!(state.remove_category("nmap"));
+        assert!(!state.categories.contains_key("nmap"));
+        assert!(!state.remove_category("nmap"));
     }
 
     #[test]

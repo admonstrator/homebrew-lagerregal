@@ -1,80 +1,155 @@
 # lagerregal
 
-A small CLI/TUI tool that reads your installed [Homebrew](https://brew.sh) formulae and casks, classifies them into categories (Networking, Security, DNS, Media & Graphics, AI & Machine Learning, ...), and gives you a searchable overview - with room for your own notes on why you installed something.
+A CLI and TUI for your installed [Homebrew](https://brew.sh) packages: classifies every formula and cask into categories (Networking, Security, DNS, Media & Graphics, …), shows what's outdated or no longer maintained, and lets you keep notes on *why* you installed something.
 
-Homebrew itself has no concept of categories or tags. `lagerregal` fills that gap with:
+Homebrew has no concept of categories or tags. `lagerregal` fills that gap.
 
-1. A curated name → category lookup for well-known packages
-2. A keyword heuristic matched against each package's name *and* description (so e.g. the thousands of `font-*` casks, which carry no description at all, still get classified from their name)
-3. Manual overrides and personal notes you set yourself, which always win
-
-Both were tuned against the full official package catalog - all ~8,500 [homebrew-core](https://github.com/Homebrew/homebrew-core) formulae and ~7,700 [homebrew-cask](https://github.com/Homebrew/homebrew-cask) casks, not just a hand-picked wishlist - as well as a real user's `brew info --json=v2 --installed` dump, to make sure it holds up against what people actually install day to day.
-
-By default, only packages you explicitly installed are shown - the dozens of C libraries Homebrew pulls in as *dependencies* of those packages are hidden (pass `--all`, or press `d` in the TUI, to include them). Everything runs locally - no network access, no API keys required.
+> **Apple Silicon only.** Builds and releases target `aarch64-apple-darwin`.
 
 ## Installation
-
-### From source (today)
-
-```sh
-cargo build --release
-./target/release/lagerregal
-```
-
-### Via Homebrew (once the tap is published, see below)
 
 ```sh
 brew tap admonstrator/lagerregal
 brew install lagerregal
 ```
 
-## Usage
-
-Running `lagerregal` with no arguments launches the interactive TUI dashboard. Individual subcommands are also available:
+Or from source:
 
 ```sh
-lagerregal scan                          # re-read installed packages, print a category summary
+cargo build --release
+./target/release/lagerregal
+```
+
+## Usage
+
+Running `lagerregal` with no arguments launches the TUI. Individual subcommands:
+
+```sh
+lagerregal scan                          # category summary of installed packages
 lagerregal list                          # table of explicitly-installed packages (alias: ls)
 lagerregal list --category DNS           # filter by category
 lagerregal list --json                   # machine-readable output
-lagerregal list --all                    # also include dependency-only packages
-lagerregal show <name>                   # details for a single package (always searches everything)
-lagerregal note <name> "<text>"          # save a personal note ("why did I install this?")
+lagerregal list --all                    # include dependency-only packages
+lagerregal show <name>                   # full details for one package
+lagerregal note <name> "<text>"          # save a personal note
 lagerregal category <name> <category>    # manually (re)classify a package
-lagerregal categories                    # list all categories with package counts
-lagerregal tui                           # launch the dashboard explicitly
+lagerregal category <name> --reset       # clear a manual override
+lagerregal categories                    # all categories with package counts
+lagerregal categories --sizes            # ...plus total on-disk size per category
+lagerregal outdated                      # packages with an update available
+lagerregal unmaintained                  # packages Homebrew marked deprecated/disabled
+lagerregal update <name>                 # upgrade one package via `brew upgrade`
+lagerregal snapshot save [name]          # snapshot current packages + versions
+lagerregal snapshot diff [name]          # compare against a saved snapshot
 ```
 
-### TUI keybindings
+Global flags: `--refresh` (bypass the cache), `--no-icons` (plain Unicode instead of Nerd Font glyphs).
 
-| Key       | Action                                   |
-|-----------|-------------------------------------------|
-| `Tab`     | Switch focus between category sidebar and package list |
+By default only packages you explicitly installed are shown — the C libraries Homebrew pulled in as dependencies are hidden. Pass `--all`, or press `d` in the TUI, to include them.
+
+`show` prints on-disk size, install date, publishing tap, update status, deprecation status, and a recursive dependency tree.
+
+Snapshots are useful around a reinstall or cleanup: `snapshot save before-cleanup`, do your thing, then `snapshot diff before-cleanup` to see exactly what was added, removed, or changed version.
+
+## TUI
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Switch focus between sidebar and package list |
 | `↑`/`↓`, `j`/`k` | Move selection |
-| `/`       | Filter/search packages by name or description |
-| `n`       | Add/edit a note for the selected package |
-| `c`       | Manually set the category of the selected package |
-| `d`       | Toggle showing dependency-only packages |
-| `Enter`   | Confirm filter/note/category input |
-| `Esc`     | Cancel input, or quit from the normal view |
-| `q`       | Quit |
+| `/` | Filter by name, description, or note |
+| `s` | Cycle sort order: name / size / install date |
+| `Enter` | Open the action menu for the selected package |
+| `u` | Update selected package(s) via `brew upgrade` (asks first) |
+| `n` | Add/edit a note |
+| `c` | Set category (applies to all multi-selected) |
+| `R` | Clear a manual category override |
+| `o` | Open the package's homepage |
+| `y` | Copy the package name to the clipboard |
+| `Space` | Toggle multi-select |
+| `d` | Toggle dependency-only packages |
+| `?` | Full keybinding overlay |
+| `Esc` | Clear selection, cancel input, or quit |
+| `q` | Quit |
+
+The sidebar has two pseudo-categories pinned above the taxonomy — **Outdated** and **Unmaintained** — that filter to exactly those packages. They're views, not real categories: selecting one doesn't change any package's classification.
+
+`u` is the one action that changes your Homebrew install, so it always confirms first, then hands the terminal over to `brew` so its own progress output renders normally. Press Enter when it's done to return; the list refreshes automatically.
+
+Multi-select (`Space`) drives bulk operations: tick off a run of packages, then `c` to categorize them all at once, `R` to reset their overrides, or `u` to update every outdated one together.
+
+### Mouse
+
+| Action | Effect |
+|--------|--------|
+| Click a sidebar / package row | Select it and focus that pane |
+| Double-click a package row | Select it and open its action menu |
+| Right-click a package row | Open its action menu directly |
+| Scroll wheel | Move the selection |
+| Click a menu item | Activate it |
+| Click outside a popup | Dismiss it |
+
+Mouse capture is released while `brew upgrade` owns the terminal, so your terminal's own selection behavior isn't hijacked mid-upgrade.
+
+### Looks
+
+The TUI uses the [Catppuccin Mocha](https://catppuccin.com) palette — fixed RGB values rather than the terminal's ANSI slots, so hues stay balanced regardless of your colorscheme.
+
+Everything carries meaning through both an icon and a color:
+
+- **Each category** has its own glyph and color, used consistently across sidebar, list, and detail pane.
+- **Formula vs. cask** is a terminal vs. monitor glyph, tinted by classification source (manual / curated / heuristic / uncategorized).
+- **Status markers**: update available, no longer maintained, manually classified, multi-selected.
+- **On-disk size** is traffic-lighted green → yellow → orange → red.
+- The header carries live counts plus a bar showing what share of your install is current.
+
+Icons are [Nerd Font](https://www.nerdfonts.com) glyphs from the Font Awesome range that every Nerd Font release ships. Without a Nerd Font they'd render as tofu boxes, so there's a fallback:
+
+```sh
+lagerregal --no-icons          # or: export LAGERREGAL_NO_ICONS=1
+```
+
+That swaps every glyph for widely-supported Unicode (`↑`, `⚠`, `●`, `$`, `▣`) and keeps column alignment identical.
+
+## Startup speed
+
+Reading Homebrew's state is the entire startup cost: `brew info --json=v2 --installed` takes ~1.9s and `brew outdated --json=v2` another ~1.0s on a ~370-package install. Almost none of that is Homebrew starting up (`brew --version` is 0.1s) — it's Homebrew loading every installed formula and cask definition, so no flag makes it cheaper.
+
+Two things bring it down:
+
+1. **The two calls run concurrently** rather than back to back, since they're independent.
+2. **Results are cached locally**, so a run where nothing changed skips `brew` entirely.
+
+| | before | after |
+|---|---|---|
+| first run / after a change | ~2.9s | ~1.9s |
+| subsequent runs | ~2.9s | ~0.04s |
+
+The cache lives at `~/Library/Application Support/lagerregal/cache.json`, validated against a fingerprint of:
+
+- the **Cellar and Caskroom listings** — entries appear and disappear on install/uninstall, and a package's directory mtime bumps on upgrade (the new version directory lands next to the old one, updating the parent's mtime);
+- **Homebrew's API/metadata cache**, which `brew update` rewrites — that's what can change a description or a deprecated flag without anything in the Cellar moving.
+
+Computing the fingerprint costs ~1ms against the ~2.9s it skips. A cache that's missing, corrupt, or written by an older build is ignored rather than surfaced as an error — a cache should cost you time, never correctness. Force a reload with `--refresh`.
 
 ## How classification works
 
 Precedence, highest wins:
 
-1. **Manual override** - set via `lagerregal category <name> <category>` or the `c` key in the TUI
-2. **Curated list** (`src/data/categories.toml`) - exact package name matches
-3. **Keyword heuristic** - matches keywords against the package's `desc` field
-4. **Uncategorized** - fallback if nothing matched
+1. **Manual override** — `lagerregal category <name> <category>`, or `c` in the TUI
+2. **Curated list** (`src/data/categories.toml`) — exact package-name matches
+3. **Keyword heuristic** — matched against the package's name *and* description, so the thousands of `font-*` casks that carry no description still classify from their name
+4. **Uncategorized** — fallback
 
-Built-in categories: Security, AI & Machine Learning, DNS, Cryptography, Networking, Media & Graphics, Fonts, Documents & PDF, Monitoring, Databases, Cloud & Infra, Dev Tools & Languages, System Utilities, Communication & Browsers, Games & Emulation, Productivity. You're not limited to these - `lagerregal category <name> <anything>` accepts any category name you want.
+Built-in categories: Security, AI & Machine Learning, DNS, Cryptography, Cryptocurrency, Networking, Media & Graphics, Fonts, Documents & PDF, Monitoring, Databases, Cloud & Infra, Dev Tools & Languages, System Utilities, Communication & Browsers, Games & Emulation, Archives & Compression, Peripherals & Input, Productivity. You aren't limited to these — `lagerregal category <name> <anything>` accepts any name.
 
-Manual overrides and notes are stored locally (not the raw package data, which is always re-read live from `brew` so it stays current) at:
+The curated list and keywords were tuned against the full official catalog (~8,500 [homebrew-core](https://github.com/Homebrew/homebrew-core) formulae and ~7,700 [homebrew-cask](https://github.com/Homebrew/homebrew-cask) casks) as well as a real ~180-package install, where they reach 0 `Uncategorized`. Against the *entire* catalog a large `Uncategorized` tail remains, which is expected: it's dominated by narrow single-purpose libraries nobody installs directly. The goal is covering what people actually install, not inventing a category for every library in existence.
 
-- macOS: `~/Library/Application Support/lagerregal/state.toml`
+Manual overrides and notes are stored at `~/Library/Application Support/lagerregal/state.toml`. Package data itself is never stored there — it comes from `brew`, via the cache described above.
 
-Run `lagerregal scan` any time (e.g. after `brew install`/`brew upgrade`) to see an updated category breakdown and spot newly `Uncategorized` packages worth classifying yourself. On a real user's ~180 explicitly-installed packages, tuning against their own `brew info --json=v2 --installed` dump got the classifier to 0 `Uncategorized` - though against the *entire* Homebrew catalog (~16,000 formulae + casks, most of which nobody has installed, many of them narrow single-purpose C libraries) a majority still land in `Uncategorized`. That's expected: the goal is covering what people actually install, not inventing a category for every possible library.
+## Privacy
+
+Everything runs locally against your existing Homebrew install. No network access, no API keys, no telemetry. `brew outdated` runs with `HOMEBREW_NO_AUTO_UPDATE=1` so it never triggers a network fetch on its own.
 
 ## Development
 
@@ -85,21 +160,27 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt
 ```
 
-Tests for Homebrew JSON parsing and the classification pipeline run against a fixture file (`tests/fixtures/brew_installed.json`) rather than a real `brew` binary, so they run anywhere Rust does. Actually exercising `brew` shell-outs and the TUI's rendering/interaction needs a real macOS machine with Homebrew installed.
+Homebrew JSON parsing, classification, the cache fingerprint, and the theme's category table all run against fixtures or temp directories rather than a real `brew`, so the test suite runs anywhere Rust does. Exercising the actual `brew` shell-outs and the TUI's rendering needs a Mac with Homebrew installed.
 
-## Publishing to your own Homebrew tap
+CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request.
 
-`lagerregal` is built with [`cargo-dist`](https://opensource.axo.dev/cargo-dist/) so tagged releases produce precompiled macOS binaries (`aarch64-apple-darwin` and `x86_64-apple-darwin`) and push a generated Homebrew formula to a tap repository. `dist-workspace.toml` in this repo has a starting configuration, but a few one-time manual steps happen outside this repo:
+## Releasing
 
-1. **Install cargo-dist** on your Mac: `brew install cargo-dist`
-2. **Create the tap repository**: a new GitHub repo named `admonstrator/homebrew-lagerregal` (the `homebrew-` prefix is required by Homebrew's tap naming convention)
-3. **Add a `HOMEBREW_TAP_TOKEN` secret** to *this* repo (`admonstrator/lagerregal`): a GitHub personal access token with push access to the tap repo
-4. **Run `cargo dist init`** in this repo to confirm/regenerate `dist-workspace.toml` against your installed cargo-dist version, then **`cargo dist generate`** to (re)generate `.github/workflows/release.yml`
-5. **Tag a release**, e.g. `git tag v0.1.0 && git push --tags` - CI builds the binaries, creates a GitHub Release, and pushes the formula to the tap
-
-After that, anyone can run:
+Releases are cut by pushing a tag. `.github/workflows/release.yml` then builds the binary, publishes a GitHub Release, and updates the Homebrew tap:
 
 ```sh
-brew tap admonstrator/lagerregal
-brew install lagerregal
+# bump version in Cargo.toml first, then:
+git tag v0.1.0
+git push origin v0.1.0
 ```
+
+One-time setup before the first release:
+
+1. **Create the tap repository** — a GitHub repo named `admonstrator/homebrew-lagerregal` (the `homebrew-` prefix is required by Homebrew's tap naming convention).
+2. **Add a `HOMEBREW_TAP_TOKEN` secret** to *this* repo: a GitHub personal access token with `contents: write` on the tap repo.
+
+The workflow generates `Formula/lagerregal.rb` in the tap with the release URL and its SHA-256, so `brew install lagerregal` pulls the prebuilt binary rather than compiling from source.
+
+## License
+
+MIT

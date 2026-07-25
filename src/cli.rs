@@ -9,6 +9,15 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
+    /// Ignore the local cache and re-read everything from `brew`. The cache
+    /// is invalidated automatically when packages change, so this is only
+    /// needed to force a refresh by hand.
+    #[arg(long, global = true)]
+    pub refresh: bool,
+    /// Render the TUI without Nerd Font glyphs (use plain Unicode instead).
+    /// Also settable via the LAGERREGAL_NO_ICONS environment variable.
+    #[arg(long, global = true, env = "LAGERREGAL_NO_ICONS")]
+    pub no_icons: bool,
 }
 
 #[derive(Subcommand)]
@@ -44,20 +53,74 @@ pub enum Command {
         /// Free-text note, e.g. "for debugging DNS on the home lab"
         text: String,
     },
-    /// Manually set (override) a package's category
+    /// Manually set (override) a package's category, or clear a previous override with --reset
     #[command(alias = "cat")]
     Category {
         /// Homebrew formula or cask name
         name: String,
         /// Category name, e.g. "Security" or "DNS" - see `lagerregal categories`
-        category: String,
+        category: Option<String>,
+        /// Clear a manual override, falling back to the curated/heuristic classification
+        #[arg(short, long, conflicts_with = "category")]
+        reset: bool,
     },
     /// List all known categories and how many installed packages are in each
     Categories {
         /// Also include packages only pulled in as a dependency of something else
         #[arg(short, long)]
         all: bool,
+        /// Also compute and show total on-disk size per category (slower - walks the filesystem)
+        #[arg(short, long)]
+        sizes: bool,
+    },
+    /// List installed packages that have an update available (runs `brew outdated`)
+    Outdated {
+        /// Also include packages only pulled in as a dependency of something else
+        #[arg(short, long)]
+        all: bool,
+        /// Output as JSON instead of a table
+        #[arg(long)]
+        json: bool,
+    },
+    /// List installed packages Homebrew has marked deprecated or disabled (no longer maintained)
+    Unmaintained {
+        /// Also include packages only pulled in as a dependency of something else
+        #[arg(short, long)]
+        all: bool,
+        /// Output as JSON instead of a table
+        #[arg(long)]
+        json: bool,
+    },
+    /// Upgrade a single installed package via `brew upgrade`
+    Update {
+        /// Homebrew formula or cask name
+        name: String,
+    },
+    /// Save or compare snapshots of your installed packages and their versions
+    Snapshot {
+        #[command(subcommand)]
+        action: SnapshotCommand,
     },
     /// Launch the interactive TUI dashboard (also the default with no subcommand)
     Tui,
+}
+
+#[derive(Subcommand)]
+pub enum SnapshotCommand {
+    /// Save the current installed packages/versions as a named snapshot (default name: "default")
+    Save {
+        /// Snapshot name, e.g. "before-reinstall"
+        name: Option<String>,
+        /// Also include packages only pulled in as a dependency of something else
+        #[arg(short, long)]
+        all: bool,
+    },
+    /// Compare the current installed packages against a saved snapshot
+    Diff {
+        /// Snapshot name to compare against (default: "default")
+        name: Option<String>,
+        /// Also include packages only pulled in as a dependency of something else
+        #[arg(short, long)]
+        all: bool,
+    },
 }
