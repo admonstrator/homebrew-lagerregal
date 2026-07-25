@@ -14,7 +14,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Command {
     /// Re-scan installed Homebrew packages and print a category summary
-    Scan,
+    Scan {
+        /// Also include packages only pulled in as a dependency of something else
+        #[arg(short, long)]
+        all: bool,
+    },
     /// List installed packages, optionally filtered by category
     #[command(alias = "ls")]
     List {
@@ -24,6 +28,9 @@ pub enum Command {
         /// Output as JSON instead of a table
         #[arg(long)]
         json: bool,
+        /// Also include packages only pulled in as a dependency of something else
+        #[arg(short, long)]
+        all: bool,
     },
     /// Show details for a single installed package
     Show {
@@ -46,7 +53,11 @@ pub enum Command {
         category: String,
     },
     /// List all known categories and how many installed packages are in each
-    Categories,
+    Categories {
+        /// Also include packages only pulled in as a dependency of something else
+        #[arg(short, long)]
+        all: bool,
+    },
     /// Launch the interactive TUI dashboard (also the default with no subcommand)
     Tui,
 }

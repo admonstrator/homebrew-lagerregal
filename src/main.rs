@@ -19,12 +19,16 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Command::Scan) => cmd_scan(),
-        Some(Command::List { category, json }) => cmd_list(category, json),
+        Some(Command::Scan { all }) => cmd_scan(all),
+        Some(Command::List {
+            category,
+            json,
+            all,
+        }) => cmd_list(category, json, all),
         Some(Command::Show { name }) => cmd_show(&name),
         Some(Command::Note { name, text }) => cmd_note(&name, &text),
         Some(Command::Category { name, category }) => cmd_category(&name, &category),
-        Some(Command::Categories) => cmd_categories(),
+        Some(Command::Categories { all }) => cmd_categories(all),
         Some(Command::Tui) | None => tui::run(),
     }
 }
@@ -44,15 +48,20 @@ fn load_classified() -> Result<Vec<ClassifiedPackage>> {
     ))
 }
 
-fn cmd_scan() -> Result<()> {
-    let classified = load_classified()?;
+fn cmd_scan(all: bool) -> Result<()> {
+    let classified = classify::filter_on_request(load_classified()?, all);
 
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     for pkg in &classified {
         *counts.entry(pkg.category.clone()).or_insert(0) += 1;
     }
 
-    println!("Scanned {} installed packages.\n", classified.len());
+    let scope = if all {
+        "installed"
+    } else {
+        "explicitly installed"
+    };
+    println!("Scanned {} {scope} packages.\n", classified.len());
 
     let mut table = Table::new();
     table.load_preset(UTF8_FULL);
@@ -107,8 +116,8 @@ impl From<&ClassifiedPackage> for PackageJson {
     }
 }
 
-fn cmd_list(category: Option<String>, json: bool) -> Result<()> {
-    let mut classified = load_classified()?;
+fn cmd_list(category: Option<String>, json: bool, all: bool) -> Result<()> {
+    let mut classified = classify::filter_on_request(load_classified()?, all);
     if let Some(ref category) = category {
         classified.retain(|p| p.category.eq_ignore_ascii_case(category));
     }
@@ -187,8 +196,8 @@ fn cmd_category(name: &str, category: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_categories() -> Result<()> {
-    let classified = load_classified()?;
+fn cmd_categories(all: bool) -> Result<()> {
+    let classified = classify::filter_on_request(load_classified()?, all);
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     for pkg in &classified {
         *counts.entry(pkg.category.clone()).or_insert(0) += 1;

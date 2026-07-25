@@ -101,6 +101,24 @@ pub fn classify(
     )
 }
 
+/// Filters out packages that were only pulled in as a dependency of
+/// something else (unless `include_deps` is set), so the default view
+/// reflects what the user actually chose to install rather than every
+/// transitive C library brew happened to build along the way.
+pub fn filter_on_request(
+    packages: Vec<ClassifiedPackage>,
+    include_deps: bool,
+) -> Vec<ClassifiedPackage> {
+    if include_deps {
+        packages
+    } else {
+        packages
+            .into_iter()
+            .filter(|p| p.package.installed_on_request)
+            .collect()
+    }
+}
+
 /// Classifies a full list of installed packages, applying manual overrides
 /// and notes from the local state store where present.
 pub fn classify_all(
@@ -162,6 +180,40 @@ mod tests {
         let (cat, source) = classify("mystery-tool", "Does something mysterious", None);
         assert_eq!(cat, UNCATEGORIZED);
         assert_eq!(source, ClassificationSource::Uncategorized);
+    }
+
+    #[test]
+    fn filter_on_request_hides_dependency_only_packages_by_default() {
+        let on_request = Package {
+            name: "nmap".into(),
+            kind: PackageKind::Formula,
+            desc: "Port scanning utility".into(),
+            homepage: "https://nmap.org".into(),
+            tap: "homebrew/core".into(),
+            version: "7.94".into(),
+            installed_on_request: true,
+        };
+        let dependency = Package {
+            name: "libpng".into(),
+            kind: PackageKind::Formula,
+            desc: "Library for manipulating PNG images".into(),
+            homepage: "http://www.libpng.org/pub/png/libpng.html".into(),
+            tap: "homebrew/core".into(),
+            version: "1.6.43".into(),
+            installed_on_request: false,
+        };
+        let classified = classify_all(
+            vec![on_request, dependency],
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        );
+
+        let default_view = filter_on_request(classified.clone(), false);
+        assert_eq!(default_view.len(), 1);
+        assert_eq!(default_view[0].package.name, "nmap");
+
+        let full_view = filter_on_request(classified, true);
+        assert_eq!(full_view.len(), 2);
     }
 
     #[test]

@@ -1,14 +1,14 @@
 # lagerregal
 
-A small CLI/TUI tool that reads your installed [Homebrew](https://brew.sh) formulae and casks, classifies them into categories (Networking, Security, DNS, Databases, ...), and gives you a searchable overview - with room for your own notes on why you installed something.
+A small CLI/TUI tool that reads your installed [Homebrew](https://brew.sh) formulae and casks, classifies them into categories (Networking, Security, DNS, Media & Graphics, AI & Machine Learning, ...), and gives you a searchable overview - with room for your own notes on why you installed something.
 
 Homebrew itself has no concept of categories or tags. `lagerregal` fills that gap with:
 
-1. A curated name → category lookup for well-known packages (weighted towards networking/security/DNS tools)
+1. A curated name → category lookup for well-known packages (validated against a real-world `brew info --json=v2 --installed` dump so it actually covers what people have installed, not just a hand-picked wishlist)
 2. A keyword heuristic that scans each package's description for anything not in the curated list
 3. Manual overrides and personal notes you set yourself, which always win
 
-Everything runs locally - no network access, no API keys required.
+By default, only packages you explicitly installed are shown - the dozens of C libraries Homebrew pulls in as *dependencies* of those packages are hidden (pass `--all`, or press `d` in the TUI, to include them). Everything runs locally - no network access, no API keys required.
 
 ## Installation
 
@@ -32,10 +32,11 @@ Running `lagerregal` with no arguments launches the interactive TUI dashboard. I
 
 ```sh
 lagerregal scan                          # re-read installed packages, print a category summary
-lagerregal list                          # table of all installed packages (alias: ls)
+lagerregal list                          # table of explicitly-installed packages (alias: ls)
 lagerregal list --category DNS           # filter by category
 lagerregal list --json                   # machine-readable output
-lagerregal show <name>                   # details for a single package
+lagerregal list --all                    # also include dependency-only packages
+lagerregal show <name>                   # details for a single package (always searches everything)
 lagerregal note <name> "<text>"          # save a personal note ("why did I install this?")
 lagerregal category <name> <category>    # manually (re)classify a package
 lagerregal categories                    # list all categories with package counts
@@ -51,6 +52,7 @@ lagerregal tui                           # launch the dashboard explicitly
 | `/`       | Filter/search packages by name or description |
 | `n`       | Add/edit a note for the selected package |
 | `c`       | Manually set the category of the selected package |
+| `d`       | Toggle showing dependency-only packages |
 | `Enter`   | Confirm filter/note/category input |
 | `Esc`     | Cancel input, or quit from the normal view |
 | `q`       | Quit |
@@ -64,11 +66,13 @@ Precedence, highest wins:
 3. **Keyword heuristic** - matches keywords against the package's `desc` field
 4. **Uncategorized** - fallback if nothing matched
 
+Built-in categories: Security, AI & Machine Learning, DNS, Cryptography, Networking, Media & Graphics, Documents & PDF, Monitoring, Databases, Cloud & Infra, Dev Tools & Languages, System Utilities, Communication & Browsers, Productivity. You're not limited to these - `lagerregal category <name> <anything>` accepts any category name you want.
+
 Manual overrides and notes are stored locally (not the raw package data, which is always re-read live from `brew` so it stays current) at:
 
 - macOS: `~/Library/Application Support/lagerregal/state.toml`
 
-Run `lagerregal scan` any time (e.g. after `brew install`/`brew upgrade`) to see an updated category breakdown and spot newly `Uncategorized` packages worth classifying yourself.
+Run `lagerregal scan` any time (e.g. after `brew install`/`brew upgrade`) to see an updated category breakdown and spot newly `Uncategorized` packages worth classifying yourself. The curated list and heuristics were tuned against a real ~180-package `brew info --json=v2 --installed` dump (explicitly-installed formulae + casks), not just guessed - that run came back with 0 packages left `Uncategorized`, though your own mix of packages will vary.
 
 ## Development
 

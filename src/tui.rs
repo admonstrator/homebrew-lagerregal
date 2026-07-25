@@ -45,6 +45,7 @@ struct App {
     filter: String,
     status: String,
     should_quit: bool,
+    show_deps: bool,
 }
 
 impl App {
@@ -62,10 +63,21 @@ impl App {
             mode: InputMode::Normal,
             input_buffer: String::new(),
             filter: String::new(),
-            status: "Tab: switch pane | j/k: move | /: filter | n: note | c: category | q: quit"
+            status: "Tab: switch pane | j/k: move | /: filter | n: note | c: category | d: deps | q: quit"
                 .to_string(),
             should_quit: false,
+            show_deps: false,
         }
+    }
+
+    /// Packages in scope given the current `show_deps` setting: by default,
+    /// only packages the user explicitly installed (excluding anything
+    /// pulled in purely as a dependency of something else).
+    fn scoped_packages(&self) -> Vec<&ClassifiedPackage> {
+        self.packages
+            .iter()
+            .filter(|p| self.show_deps || p.package.installed_on_request)
+            .collect()
     }
 
     /// "All" plus every known taxonomy category, plus any custom category
@@ -74,7 +86,7 @@ impl App {
     fn sidebar_categories(&self) -> Vec<String> {
         let known = classify::known_categories();
         let mut extra: Vec<String> = self
-            .packages
+            .scoped_packages()
             .iter()
             .map(|p| p.category.clone())
             .filter(|c| !known.contains(c))
@@ -99,8 +111,8 @@ impl App {
     fn visible_packages(&self) -> Vec<&ClassifiedPackage> {
         let category = self.selected_category();
         let filter = self.filter.to_lowercase();
-        self.packages
-            .iter()
+        self.scoped_packages()
+            .into_iter()
             .filter(|p| category == ALL_CATEGORY || p.category == category)
             .filter(|p| {
                 filter.is_empty()
@@ -131,7 +143,9 @@ impl App {
     }
 }
 
-fn category_counts(packages: &[ClassifiedPackage]) -> BTreeMap<String, usize> {
+fn category_counts<'a>(
+    packages: impl IntoIterator<Item = &'a ClassifiedPackage>,
+) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();
     for p in packages {
         *counts.entry(p.category.clone()).or_insert(0) += 1;
@@ -218,6 +232,10 @@ fn handle_normal_key(app: &mut App, code: KeyCode) {
                 app.input_buffer.clear();
                 app.mode = InputMode::Category;
             }
+        }
+        KeyCode::Char('d') => {
+            app.show_deps = !app.show_deps;
+            app.list_state.select(Some(0));
         }
         _ => {}
     }
@@ -331,8 +349,9 @@ fn draw(f: &mut Frame, app: &mut App) {
 
 fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     let categories = app.sidebar_categories();
-    let counts = category_counts(&app.packages);
-    let total = app.packages.len();
+    let scoped = app.scoped_packages();
+    let counts = category_counts(scoped.iter().copied());
+    let total = scoped.len();
     let focused = app.focus == Focus::Sidebar;
 
     let items: Vec<ListItem> = categories
@@ -347,6 +366,11 @@ fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
 
+    let title = if app.show_deps {
+        "Categories (incl. deps)"
+    } else {
+        "Categories"
+    };
     let border_style = if focused {
         Style::default().fg(Color::Yellow)
     } else {
@@ -355,7 +379,7 @@ fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     let list = List::new(items)
         .block(
             Block::default()
-                .title("Categories")
+                .title(title)
                 .borders(Borders::ALL)
                 .border_style(border_style),
         )
