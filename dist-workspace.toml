@@ -1,0 +1,33 @@
+# Configuration for `cargo-dist` (https://opensource.axo.dev/cargo-dist/),
+# which builds release binaries for tagged versions and publishes a Homebrew
+# formula to a separate tap repository so others can `brew install lagerregal`.
+#
+# This file was hand-written against the cargo-dist 0.32.0 config schema
+# (verified directly against that version's source, since this sandbox has
+# no Homebrew to install cargo-dist from and compiling it from source here
+# timed out). Before relying on it, install cargo-dist on your Mac
+# (`brew install cargo-dist`) and run `cargo dist init` / `cargo dist
+# generate` once - it will confirm or correct this config for whatever
+# version you actually have, and generate `.github/workflows/release.yml`
+# to match (that workflow is intentionally NOT hand-written here: it's a
+# multi-job pipeline cargo-dist regenerates for you, and hand-authoring it
+# would drift from what the installed tool actually expects).
+
+[workspace]
+members = ["."]
+
+[dist]
+dist-version = "0.32.0"
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+
+[dist.ci]
+github = true
+
+[dist.installers.homebrew]
+# Separate GitHub repo, following Homebrew's required `homebrew-<name>` naming.
+# You need to create this repo yourself and add a `HOMEBREW_TAP_TOKEN` secret
+# (a GitHub PAT with push access to it) to this repo - see README.md.
+tap = "admonstrator/homebrew-lagerregal"
+
+[dist.publishers]
+homebrew = true

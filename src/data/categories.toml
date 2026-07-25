@@ -1,0 +1,185 @@
+# Curated classification data bundled into the `lagerregal` binary at compile time.
+#
+# `curated`: exact package-name -> category lookup, checked before any heuristic.
+# `heuristics`: category -> list of lowercase substrings matched against a package's
+# `desc` field when no curated entry exists. First matching category wins; order
+# follows the table below (top to bottom).
+
+[curated]
+# --- Networking ---
+nmap = "Networking"
+wireshark = "Networking"
+tshark = "Networking"
+tcpdump = "Networking"
+mtr = "Networking"
+iperf3 = "Networking"
+netcat = "Networking"
+nc = "Networking"
+socat = "Networking"
+wireguard-tools = "Networking"
+openvpn = "Networking"
+nginx = "Networking"
+haproxy = "Networking"
+arp-scan = "Networking"
+masscan = "Networking"
+ngrep = "Networking"
+iftop = "Networking"
+nethogs = "Networking"
+speedtest-cli = "Networking"
+netcat-openbsd = "Networking"
+proxychains-ng = "Networking"
+tailscale = "Networking"
+
+# --- Security ---
+hashcat = "Security"
+john = "Security"
+john-jumbo = "Security"
+aircrack-ng = "Security"
+nikto = "Security"
+sqlmap = "Security"
+hydra = "Security"
+gobuster = "Security"
+ffuf = "Security"
+metasploit = "Security"
+yara = "Security"
+clamav = "Security"
+lynis = "Security"
+chkrootkit = "Security"
+bettercap = "Security"
+wifite = "Security"
+tcpflow = "Security"
+radare2 = "Security"
+binwalk = "Security"
+foremost = "Security"
+nuclei = "Security"
+osv-scanner = "Security"
+trivy = "Security"
+semgrep = "Security"
+
+# --- DNS ---
+bind = "DNS"
+dnsmasq = "DNS"
+unbound = "DNS"
+dnscrypt-proxy = "DNS"
+ldns = "DNS"
+dog = "DNS"
+doggo = "DNS"
+knot = "DNS"
+knot-resolver = "DNS"
+powerdns = "DNS"
+dnsperf = "DNS"
+dnstop = "DNS"
+dnsrecon = "DNS"
+dnsenum = "DNS"
+massdns = "DNS"
+
+# --- Cryptography ---
+openssl = "Cryptography"
+"openssl@3" = "Cryptography"
+libressl = "Cryptography"
+gnupg = "Cryptography"
+mkcert = "Cryptography"
+step = "Cryptography"
+step-cli = "Cryptography"
+age = "Cryptography"
+sops = "Cryptography"
+certbot = "Cryptography"
+
+# --- Monitoring & Observability ---
+prometheus = "Monitoring"
+grafana = "Monitoring"
+htop = "Monitoring"
+btop = "Monitoring"
+glances = "Monitoring"
+netdata = "Monitoring"
+telegraf = "Monitoring"
+
+# --- Databases ---
+postgresql = "Databases"
+"postgresql@14" = "Databases"
+"postgresql@16" = "Databases"
+mysql = "Databases"
+redis = "Databases"
+sqlite = "Databases"
+mongodb-community = "Databases"
+mariadb = "Databases"
+influxdb = "Databases"
+
+# --- Cloud & Infra ---
+terraform = "Cloud & Infra"
+awscli = "Cloud & Infra"
+kubectl = "Cloud & Infra"
+helm = "Cloud & Infra"
+ansible = "Cloud & Infra"
+azure-cli = "Cloud & Infra"
+google-cloud-sdk = "Cloud & Infra"
+packer = "Cloud & Infra"
+vault = "Cloud & Infra"
+consul = "Cloud & Infra"
+docker = "Cloud & Infra"
+docker-compose = "Cloud & Infra"
+colima = "Cloud & Infra"
+
+# --- Dev Tools & Languages ---
+git = "Dev Tools & Languages"
+node = "Dev Tools & Languages"
+"python@3.12" = "Dev Tools & Languages"
+"python@3.13" = "Dev Tools & Languages"
+go = "Dev Tools & Languages"
+rust = "Dev Tools & Languages"
+jq = "Dev Tools & Languages"
+ripgrep = "Dev Tools & Languages"
+fzf = "Dev Tools & Languages"
+gh = "Dev Tools & Languages"
+cmake = "Dev Tools & Languages"
+llvm = "Dev Tools & Languages"
+
+# --- Productivity ---
+tmux = "Productivity"
+tree = "Productivity"
+bat = "Productivity"
+eza = "Productivity"
+neovim = "Productivity"
+starship = "Productivity"
+fd = "Productivity"
+wget = "Productivity"
+curl = "Productivity"
+
+# Evaluated top to bottom; the first category whose keyword appears in a
+# package's `desc` wins. More specific categories are listed before more
+# generic ones (e.g. Security/DNS before the catch-all Productivity).
+[[heuristic]]
+category = "Security"
+keywords = ["security", "exploit", "vulnerab", "penetration", "malware", "antivirus", "password crack", "forensic", "intrusion", "brute force", "reverse engineer"]
+
+[[heuristic]]
+category = "DNS"
+keywords = ["dns", "domain name system", "name server", "nameserver"]
+
+[[heuristic]]
+category = "Cryptography"
+keywords = ["cryptograph", "encrypt", " tls", "ssl", "certificate", "pgp", "gpg"]
+
+[[heuristic]]
+category = "Networking"
+keywords = ["network", "packet", "firewall", "vpn", "proxy", "tunnel", "load balanc", "bandwidth", "traffic analy"]
+
+[[heuristic]]
+category = "Monitoring"
+keywords = ["monitor", "metrics", "observability", "log aggregat", "dashboard", "telemetry"]
+
+[[heuristic]]
+category = "Databases"
+keywords = ["database", " sql", "key-value store", "document store", "time series"]
+
+[[heuristic]]
+category = "Cloud & Infra"
+keywords = ["cloud", "kubernetes", "container", "infrastructure as code", "orchestrat", "provisioning", "virtual machine"]
+
+[[heuristic]]
+category = "Dev Tools & Languages"
+keywords = ["compiler", "programming language", "interpreter", "build system", "version control", "package manager", "linter"]
+
+[[heuristic]]
+category = "Productivity"
+keywords = ["terminal", "shell", "file manager", "text editor", "file retriever"]

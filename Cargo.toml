@@ -1,0 +1,26 @@
+[package]
+name = "lagerregal"
+version = "0.1.0"
+edition = "2021"
+description = "Classify and browse your installed Homebrew packages by category"
+license = "MIT"
+repository = "https://github.com/admonstrator/lagerregal"
+
+[[bin]]
+name = "lagerregal"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+anyhow = "1"
+directories = "5"
+comfy-table = "7"
+ratatui = "0.29"
+crossterm = "0.28"
+
+[profile.release]
+lto = true
+strip = true
