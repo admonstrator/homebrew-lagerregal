@@ -1,0 +1,353 @@
+# Curated classification data bundled into the `lagerregal` binary at compile time.
+#
+# `curated`: exact package-name -> category lookup, checked before any heuristic.
+# `heuristic`: ordered list of {category, keywords}, matched (in order) against a
+# package's `desc` field when no curated entry exists. First matching category wins.
+#
+# The curated list and keyword choices were validated against a real
+# `brew info --json=v2 --installed` dump (~180 explicitly-installed formulae
+# and casks) to keep the "Uncategorized" bucket small in practice, not just
+# in theory.
+
+[curated]
+# --- Networking ---
+nmap = "Networking"
+wireshark = "Networking"
+tshark = "Networking"
+tcpdump = "Networking"
+mtr = "Networking"
+iperf3 = "Networking"
+netcat = "Networking"
+nc = "Networking"
+socat = "Networking"
+wireguard-tools = "Networking"
+openvpn = "Networking"
+nginx = "Networking"
+haproxy = "Networking"
+arp-scan = "Networking"
+masscan = "Networking"
+ngrep = "Networking"
+iftop = "Networking"
+nethogs = "Networking"
+speedtest-cli = "Networking"
+netcat-openbsd = "Networking"
+proxychains-ng = "Networking"
+tailscale = "Networking"
+aria2 = "Networking"
+havn = "Networking"
+rustscan = "Networking"
+httpie = "Networking"
+telnet = "Networking"
+whosthere = "Networking"
+rustdesk = "Networking"
+wget = "Networking"
+curl = "Networking"
+
+# --- Security ---
+hashcat = "Security"
+john = "Security"
+john-jumbo = "Security"
+aircrack-ng = "Security"
+nikto = "Security"
+sqlmap = "Security"
+hydra = "Security"
+gobuster = "Security"
+ffuf = "Security"
+metasploit = "Security"
+yara = "Security"
+clamav = "Security"
+lynis = "Security"
+chkrootkit = "Security"
+bettercap = "Security"
+wifite = "Security"
+tcpflow = "Security"
+radare2 = "Security"
+binwalk = "Security"
+foremost = "Security"
+nuclei = "Security"
+osv-scanner = "Security"
+trivy = "Security"
+semgrep = "Security"
+1password = "Security"
+1password-cli = "Security"
+dangerzone = "Security"
+knockknock = "Security"
+mullvad-browser = "Security"
+qflipper = "Security"
+
+# --- DNS ---
+bind = "DNS"
+dnsmasq = "DNS"
+unbound = "DNS"
+dnscrypt-proxy = "DNS"
+ldns = "DNS"
+dog = "DNS"
+doggo = "DNS"
+knot = "DNS"
+knot-resolver = "DNS"
+powerdns = "DNS"
+dnsperf = "DNS"
+dnstop = "DNS"
+dnsrecon = "DNS"
+dnsenum = "DNS"
+massdns = "DNS"
+quien = "DNS"
+
+# --- Cryptography ---
+openssl = "Cryptography"
+"openssl@3" = "Cryptography"
+libressl = "Cryptography"
+gnupg = "Cryptography"
+mkcert = "Cryptography"
+step = "Cryptography"
+step-cli = "Cryptography"
+age = "Cryptography"
+sops = "Cryptography"
+certbot = "Cryptography"
+
+# --- Monitoring & Observability ---
+prometheus = "Monitoring"
+grafana = "Monitoring"
+htop = "Monitoring"
+btop = "Monitoring"
+glances = "Monitoring"
+netdata = "Monitoring"
+telegraf = "Monitoring"
+
+# --- Databases ---
+postgresql = "Databases"
+"postgresql@14" = "Databases"
+"postgresql@16" = "Databases"
+mysql = "Databases"
+redis = "Databases"
+sqlite = "Databases"
+mongodb-community = "Databases"
+mariadb = "Databases"
+influxdb = "Databases"
+
+# --- Cloud & Infra ---
+terraform = "Cloud & Infra"
+awscli = "Cloud & Infra"
+kubectl = "Cloud & Infra"
+helm = "Cloud & Infra"
+ansible = "Cloud & Infra"
+azure-cli = "Cloud & Infra"
+google-cloud-sdk = "Cloud & Infra"
+packer = "Cloud & Infra"
+vault = "Cloud & Infra"
+consul = "Cloud & Infra"
+docker = "Cloud & Infra"
+docker-compose = "Cloud & Infra"
+colima = "Cloud & Infra"
+docker-credential-helper = "Cloud & Infra"
+dockviz = "Cloud & Infra"
+lazydocker = "Cloud & Infra"
+parallels = "Cloud & Infra"
+
+# --- Dev Tools & Languages ---
+git = "Dev Tools & Languages"
+node = "Dev Tools & Languages"
+"python@3.12" = "Dev Tools & Languages"
+"python@3.13" = "Dev Tools & Languages"
+"python@3.14" = "Dev Tools & Languages"
+"python-gdbm@3.14" = "Dev Tools & Languages"
+"python-tk@3.14" = "Dev Tools & Languages"
+go = "Dev Tools & Languages"
+rust = "Dev Tools & Languages"
+jq = "Dev Tools & Languages"
+ripgrep = "Dev Tools & Languages"
+fzf = "Dev Tools & Languages"
+gh = "Dev Tools & Languages"
+cmake = "Dev Tools & Languages"
+llvm = "Dev Tools & Languages"
+act = "Dev Tools & Languages"
+cocoapods = "Dev Tools & Languages"
+github = "Dev Tools & Languages"
+github-mcp-server = "Dev Tools & Languages"
+idb-companion = "Dev Tools & Languages"
+pipx = "Dev Tools & Languages"
+rustup = "Dev Tools & Languages"
+simutil = "Dev Tools & Languages"
+tuist = "Dev Tools & Languages"
+uv = "Dev Tools & Languages"
+vite = "Dev Tools & Languages"
+xcodegen = "Dev Tools & Languages"
+visual-studio-code = "Dev Tools & Languages"
+android-studio = "Dev Tools & Languages"
+chrome-cli = "Dev Tools & Languages"
+mas = "Dev Tools & Languages"
+
+# --- AI & Machine Learning ---
+apfel = "AI & Machine Learning"
+hf = "AI & Machine Learning"
+"llama.cpp" = "AI & Machine Learning"
+llmfit = "AI & Machine Learning"
+lm-studio = "AI & Machine Learning"
+google-gemini = "AI & Machine Learning"
+upscayl = "AI & Machine Learning"
+whisper-cpp = "AI & Machine Learning"
+
+# --- Media & Graphics ---
+affinity = "Media & Graphics"
+audacity = "Media & Graphics"
+cdrtools = "Media & Graphics"
+clipgrab = "Media & Graphics"
+ffmpeg = "Media & Graphics"
+ffmpeg-full = "Media & Graphics"
+handbrake-app = "Media & Graphics"
+imagemagick = "Media & Graphics"
+kap = "Media & Graphics"
+macsvg = "Media & Graphics"
+obs = "Media & Graphics"
+pngcrush = "Media & Graphics"
+screenkite = "Media & Graphics"
+shotcut = "Media & Graphics"
+shutter-encoder = "Media & Graphics"
+shottr = "Media & Graphics"
+viz = "Media & Graphics"
+canva = "Media & Graphics"
+
+# --- Documents & PDF ---
+foxitreader = "Documents & PDF"
+htmldoc = "Documents & PDF"
+notion = "Documents & PDF"
+obsidian = "Documents & PDF"
+onlyoffice = "Documents & PDF"
+pandoc = "Documents & PDF"
+poppler = "Documents & PDF"
+qpdf = "Documents & PDF"
+stirling-pdf = "Documents & PDF"
+typora = "Documents & PDF"
+weasyprint = "Documents & PDF"
+tesseract-lang = "Documents & PDF"
+archivewebpage = "Documents & PDF"
+
+# --- System Utilities ---
+balenaetcher = "System Utilities"
+betterdisplay = "System Utilities"
+cleanmymac-cli = "System Utilities"
+keyclu = "System Utilities"
+loop = "System Utilities"
+mac-cleanup-go = "System Utilities"
+mackup = "System Utilities"
+macusb = "System Utilities"
+mole = "System Utilities"
+ncdu = "System Utilities"
+onyx = "System Utilities"
+pearcleaner = "System Utilities"
+portkiller = "System Utilities"
+radix = "System Utilities"
+tabtab = "System Utilities"
+taskexplorer = "System Utilities"
+testdisk = "System Utilities"
+witr = "System Utilities"
+
+# --- Communication & Browsers ---
+discord = "Communication & Browsers"
+emclient = "Communication & Browsers"
+google-chrome = "Communication & Browsers"
+microsoft-teams = "Communication & Browsers"
+vivaldi = "Communication & Browsers"
+whatsapp = "Communication & Browsers"
+microsoft-auto-update = "Communication & Browsers"
+
+# --- Archives & Compression ---
+cabextract = "Archives & Compression"
+keka = "Archives & Compression"
+sevenzip = "Archives & Compression"
+wimlib = "Archives & Compression"
+snappy = "Archives & Compression"
+
+# --- Productivity ---
+tmux = "Productivity"
+tree = "Productivity"
+bat = "Productivity"
+eza = "Productivity"
+neovim = "Productivity"
+starship = "Productivity"
+fd = "Productivity"
+calcurse = "Productivity"
+maccy = "Productivity"
+tlrc = "Productivity"
+
+# Evaluated top to bottom; the first category whose keyword appears in a
+# package's `desc` wins. More specific categories are listed before more
+# generic ones (e.g. Security/DNS before the catch-all Productivity).
+[[heuristic]]
+category = "Security"
+keywords = ["security", "exploit", "vulnerab", "penetration", "malware", "antivirus", "password crack", "password manager", "forensic", "intrusion", "brute force", "reverse engineer", "privacy"]
+
+[[heuristic]]
+category = "AI & Machine Learning"
+keywords = ["machine learning", "language model", " llm", "artificial intelligence", "neural network", "generative ai", "openai", "computer vision"]
+
+[[heuristic]]
+category = "DNS"
+keywords = ["dns", "domain name system", "name server", "nameserver", "whois"]
+
+[[heuristic]]
+category = "Cryptography"
+keywords = ["cryptograph", "encrypt", " tls", "ssl", "certificate", "pgp", "gpg"]
+
+[[heuristic]]
+category = "Cryptocurrency"
+keywords = ["cryptocurrency", "cryptocurrencies", "crypto wallet", "hardware wallet", "blockchain", "bitcoin", "ethereum", "litecoin", "crypto asset", "coin wallet", "digital currency", " nft "]
+
+[[heuristic]]
+category = "Networking"
+keywords = ["network", "packet", "firewall", "vpn", "proxy", "tunnel", "load balanc", "bandwidth", "traffic analy", "port scan"]
+
+[[heuristic]]
+category = "Media & Graphics"
+keywords = ["video", "audio codec", "audio editor", "image editing", "image manipulat", "screen record", "transcod", "photo editing", "screenshot", "music"]
+
+[[heuristic]]
+category = "Fonts"
+# Matched against name+desc together: most `font-*` casks (there are
+# thousands) ship with no `desc` at all, only a name that starts with
+# "font-", so the "font-" keyword below matches on the name instead.
+keywords = ["font-", "typeface", "font family"]
+
+[[heuristic]]
+category = "Documents & PDF"
+keywords = ["pdf", "document editor", "markdown", "word processing", "note-taking", "knowledge base", "ocr", "optical character recognition"]
+
+[[heuristic]]
+category = "Monitoring"
+keywords = ["monitor", "metrics", "observability", "log aggregat", "dashboard", "telemetry"]
+
+[[heuristic]]
+category = "Databases"
+keywords = ["database", " sql", "key-value store", "document store", "time series"]
+
+[[heuristic]]
+category = "Cloud & Infra"
+keywords = ["cloud", "kubernetes", "container", "infrastructure as code", "orchestrat", "provisioning", "virtual machine", "virtualization"]
+
+[[heuristic]]
+category = "Dev Tools & Languages"
+keywords = ["compiler", "programming language", "interpreter", "build system", "version control", "package manager", "linter", "git ", "language server"]
+
+[[heuristic]]
+category = "System Utilities"
+keywords = ["clean up", "cleaner", "uninstall", "disk usage", "disk space", "window manager", "clipboard manager", "bootable", "data recovery", "menu bar app"]
+
+[[heuristic]]
+category = "Communication & Browsers"
+keywords = ["web browser", "chat", "video call", "email client", "messaging app"]
+
+[[heuristic]]
+category = "Games & Emulation"
+keywords = ["game", "emulat", "gaming"]
+
+[[heuristic]]
+category = "Archives & Compression"
+keywords = ["compress", "decompress", "archive utility", "archive manager", "archive format", "archiving tool", "archiv", " zip ", "unzip", "extract files", "tar file", "gzip", "lossless compress"]
+
+[[heuristic]]
+category = "Peripherals & Input"
+keywords = ["keyboard", "trackpad", "touchpad", "mouse", "gesture", "input device", "game controller", "gamepad", "joystick"]
+
+[[heuristic]]
+category = "Productivity"
+keywords = ["terminal", "shell", "file manager", "text editor", "file retriever", "personal organizer", "file archiver"]
