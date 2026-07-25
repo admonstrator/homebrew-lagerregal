@@ -13,6 +13,8 @@ brew tap admonstrator/lagerregal
 brew install lagerregal
 ```
 
+This repository *is* the tap: it's named `homebrew-lagerregal`, which is what `brew tap admonstrator/lagerregal` resolves to, and the generated formula lives here under `Formula/`. So there's no second repository to maintain and no access token to manage — the release workflow updates the formula with its own built-in `GITHUB_TOKEN`.
+
 Or from source:
 
 ```sh
@@ -166,7 +168,7 @@ CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pu
 
 ## Releasing
 
-Releases are cut by pushing a tag. `.github/workflows/release.yml` then builds the binary, publishes a GitHub Release, and updates the Homebrew tap:
+Releases are cut by pushing a tag:
 
 ```sh
 # bump version in Cargo.toml first, then:
@@ -174,12 +176,14 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-One-time setup before the first release:
+`.github/workflows/release.yml` then:
 
-1. **Create the tap repository** — a GitHub repo named `admonstrator/homebrew-lagerregal` (the `homebrew-` prefix is required by Homebrew's tap naming convention).
-2. **Add a `HOMEBREW_TAP_TOKEN` secret** to *this* repo: a GitHub personal access token with `contents: write` on the tap repo.
+1. checks that the tag matches the version in `Cargo.toml`, failing loudly if it doesn't;
+2. builds the `aarch64-apple-darwin` binary and packages it as a tarball;
+3. publishes a GitHub Release with that tarball attached;
+4. regenerates `Formula/lagerregal.rb` with the release URL and its SHA-256, and commits it to the default branch.
 
-The workflow generates `Formula/lagerregal.rb` in the tap with the release URL and its SHA-256, so `brew install lagerregal` pulls the prebuilt binary rather than compiling from source.
+No setup or secrets are required — the formula lives in this repo, so the workflow's built-in `GITHUB_TOKEN` is enough to update it. `Formula/lagerregal.rb` is generated, not hand-maintained; change the workflow rather than the file.
 
 ## License
 
