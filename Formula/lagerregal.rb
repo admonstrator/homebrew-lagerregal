@@ -3,15 +3,15 @@
 class Lagerregal < Formula
   desc "Classify and browse your installed Homebrew packages by category"
   homepage "https://github.com/admonstrator/homebrew-lagerregal"
-  version "0.2.0"
+  version "0.3.0"
   license "MIT"
 
   if Hardware::CPU.arm?
-    url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.2.0/lagerregal-0.2.0-aarch64-apple-darwin.tar.gz"
-    sha256 "b24b3bc5db4fa6f7e20c4fc06c2c11b8ba12ee51dd73fe589f7f8fb1dbfd970a"
+    url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.3.0/lagerregal-0.3.0-aarch64-apple-darwin.tar.gz"
+    sha256 "bda21e91dfcbd4caf7406bc4464bf20d51a72b09e14430ea55e057b8f712292c"
   else
-    url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.2.0/lagerregal-0.2.0-x86_64-apple-darwin.tar.gz"
-    sha256 "c3d6e90dc093cfd98c623be03585ffeac788aa7bbc00450d6aaecf2b6fe7a505"
+    url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.3.0/lagerregal-0.3.0-x86_64-apple-darwin.tar.gz"
+    sha256 "b95412736cd582b6748bae8e4ff7c403d4f4bbd3d9ee9a972ca32fb8e6fed756"
   end
 
   depends_on :macos
