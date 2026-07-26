@@ -38,6 +38,37 @@ pub struct ClassifiedPackage {
 struct Heuristic {
     category: String,
     keywords: Vec<String>,
+    /// Phrases that veto this category even when a keyword matched. Exists
+    /// for words that mean something else in a specific context - "terminal
+    /// emulator" contains "emulat" without being about games.
+    #[serde(default)]
+    exclude: Vec<String>,
+}
+
+/// Length at or below which a keyword must start at a word boundary.
+///
+/// Short keywords collide by accident: "ssl" inside "lossless", "ocr" inside
+/// "gocryptfs", "dns" inside "cjdns". Long ones essentially don't, and
+/// several rely on matching mid-word ("compiler" in "decompiler", "game" in
+/// "videogame"), so the rule is deliberately limited to the short ones.
+const BOUNDARY_REQUIRED_UP_TO: usize = 4;
+
+/// Whether `keyword` occurs in `haystack`, honouring the word-boundary rule
+/// for short keywords. Growth to the *right* is always allowed, so stems
+/// like "emulat" still match "emulator" and "emulation".
+fn keyword_matches(keyword: &str, haystack: &str) -> bool {
+    let needs_boundary = keyword.trim().len() <= BOUNDARY_REQUIRED_UP_TO
+        && keyword.starts_with(|c: char| c.is_ascii_alphanumeric());
+    if !needs_boundary {
+        return haystack.contains(keyword);
+    }
+    haystack.match_indices(keyword).any(|(at, _)| {
+        at == 0
+            || !haystack[..at]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_ascii_alphanumeric())
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,7 +125,10 @@ pub fn classify(
     // like "font-" without needing one curated entry per package.
     let haystack = format!("{name} {desc}").to_lowercase();
     for h in &data.heuristic {
-        if h.keywords.iter().any(|kw| haystack.contains(kw.as_str())) {
+        if h.exclude.iter().any(|ex| haystack.contains(ex.as_str())) {
+            continue;
+        }
+        if h.keywords.iter().any(|kw| keyword_matches(kw, &haystack)) {
             return (h.category.clone(), ClassificationSource::Heuristic);
         }
     }
@@ -180,6 +214,81 @@ mod tests {
         );
         assert_eq!(cat, "DNS");
         assert_eq!(source, ClassificationSource::Heuristic);
+    }
+
+    #[test]
+    fn terminal_emulators_are_not_games() {
+        // The bug this guards: "emulat" is the right stem for game
+        // emulators, and a terminal emulator is not one.
+        let (cat, _) = classify(
+            "ghostty",
+            "Terminal emulator that uses platform-native UI and GPU acceleration",
+            None,
+        );
+        assert_eq!(cat, "Productivity");
+
+        let (cat, _) = classify("foot", "Fast, lightweight Wayland terminal emulator", None);
+        assert_eq!(cat, "Productivity");
+    }
+
+    #[test]
+    fn actual_game_emulators_still_classify_as_games() {
+        // The other half of the same rule: don't fix terminals by breaking
+        // the case the keyword exists for.
+        for (name, desc) in [
+            ("atari800", "Atari 8-bit machine emulator"),
+            ("fceux", "All-in-one NES/Famicom Emulator"),
+            (
+                "dosbox-x",
+                "DOSBox with accurate emulation and wide testing",
+            ),
+        ] {
+            let (cat, _) = classify(name, desc, None);
+            assert_eq!(
+                cat, "Games & Emulation",
+                "{name} should stay a game emulator"
+            );
+        }
+    }
+
+    #[test]
+    fn short_keywords_do_not_match_inside_other_words() {
+        // "ssl" inside "lossless" used to file compression tools under
+        // Cryptography; "dns" inside "cjdns" filed a mesh router under DNS.
+        let (cat, _) = classify(
+            "brotli",
+            "Generic-purpose lossless compression algorithm",
+            None,
+        );
+        assert_eq!(cat, "Archives & Compression");
+
+        let (cat, _) = classify("flac", "Free lossless audio codec", None);
+        assert_eq!(cat, "Media & Graphics");
+    }
+
+    #[test]
+    fn short_keywords_still_match_as_whole_words_and_in_known_compounds() {
+        // The boundary rule must not cost us the legitimate hits: a bare
+        // occurrence, and the compounds spelled out in categories.toml.
+        let (cat, _) = classify("some-tool", "Talks TLS over SSL sockets", None);
+        assert_eq!(cat, "Cryptography");
+
+        let (cat, _) = classify("hopenpgp-tools", "Command-line tools for OpenPGP", None);
+        assert_eq!(cat, "Cryptography");
+
+        let (cat, _) = classify("ddns-go", "Simple and easy-to-use DDNS", None);
+        assert_eq!(cat, "DNS");
+    }
+
+    #[test]
+    fn long_keywords_may_still_match_mid_word() {
+        // Several stems depend on this: "compiler" inside "decompiler",
+        // "game" inside "videogame".
+        let (cat, _) = classify("jadx", "Dex to Java decompiler", None);
+        assert_eq!(cat, "Dev Tools & Languages");
+
+        let (cat, _) = classify("myman", "Text-mode videogame inspired by Pac-Man", None);
+        assert_eq!(cat, "Games & Emulation");
     }
 
     #[test]
