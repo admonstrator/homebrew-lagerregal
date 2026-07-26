@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`lagerregal` is a Rust CLI/TUI that reads a user's installed Homebrew formulae and casks, classifies them into categories (Homebrew itself has no such concept), and gives a searchable overview with room for personal notes. It's a single binary crate (no library target) meant to eventually be distributed via a Homebrew tap.
+`lagerregal` is a Rust CLI/TUI that reads a user's installed Homebrew formulae and casks, classifies them into categories (Homebrew itself has no such concept), and gives a searchable overview with room for personal notes, update/pin/uninstall handling, and dependency insight. It's a single binary crate (no library target), distributed via this repo doubling as its own Homebrew tap (`admonstrator/lagerregal`).
 
 ## Commands
 
@@ -19,37 +19,41 @@ cargo fmt --check                            # verify formatting without changin
 ./target/debug/lagerregal <subcommand>       # run locally
 ```
 
-There is no library target, so `cargo test --lib` does not work - unit tests live inline in each `src/*.rs` module and run as part of the `--bin lagerregal` test target (plain `cargo test` handles this correctly).
+There is no library target, so `cargo test --lib` does not work - unit tests live inline in each module and run as part of the `--bin lagerregal` test target (plain `cargo test` handles this correctly).
 
-This repo/sandbox has no `brew` binary and no macOS. Anything that shells out to `brew` (`homebrew.rs::installed_packages`) cannot be exercised live here - tests instead run `parse_brew_json` against `tests/fixtures/brew_installed.json`. The interactive TUI (`tui.rs`) also can't be visually verified outside a real terminal/macOS. When changing either, reason carefully and rely on the fixture-based tests; final verification needs a real Mac with Homebrew installed.
+When developing on a Mac with Homebrew installed, everything can be exercised live - including the TUI, which is best verified inside `tmux` (`tmux send-keys` for input, SGR escape sequences for mouse events, `tmux capture-pane -p` to read frames). In environments *without* `brew`, anything that shells out to it can't run; tests deliberately don't need it: parsing runs against `tests/fixtures/brew_installed.json`, and full TUI frames render into ratatui's `TestBackend`.
 
 ## Architecture
 
 Module responsibilities (`src/`):
 
-- `main.rs` - clap dispatch + one `cmd_*` function per subcommand (`scan`, `list`, `show`, `note`, `category`, `categories`). `load_classified()` is the shared entry point: shells out to `brew`, loads local state, classifies. Always fetches live from `brew` rather than caching raw package data, so results stay current; only manual overrides/notes are persisted.
-- `cli.rs` - clap `Subcommand` enum defining the CLI surface.
-- `homebrew.rs` - runs `brew info --json=v2 --installed` and parses it into a normalized `Package` (formula or cask). `parse_brew_json` is split out from the `brew`-invoking function specifically so it's testable via a fixture.
+- `main.rs` - clap dispatch + one `cmd_*` function per subcommand (`scan`, `list`, `show`, `note`, `category`, `categories`, `outdated`, `unmaintained`, `orphans`, `update`, `snapshot`, `tui`). `load_packages()` is the shared loader (parallel `brew` calls + cache), `load_classified()` layers local state and classification on top.
+- `cli.rs` - clap `Subcommand` enum defining the CLI surface, plus the global `--refresh` / `--no-icons` flags.
+- `homebrew.rs` - runs `brew info --json=v2 --installed` / `brew outdated --json=v2` and parses them into a normalized `Package`; also the mutating shell-outs (`upgrade`, `uninstall`, `set_pinned`). `parse_brew_json` is split out from the `brew`-invoking function specifically so it's testable via a fixture. `Package.dependencies` holds *directly declared* runtime deps (for the dependency tree); `Package.indirect_dependencies` holds the transitive tail from the install receipts - orphan analysis needs both.
 - `classify.rs` - the classification pipeline and `ClassifiedPackage`/`ClassificationSource` types.
-- `src/data/categories.toml` - the curated data, embedded into the binary at compile time via `include_str!` (parsed once into a `OnceLock`). Two tables: `[curated]` (exact `package-name = "Category"` map) and `[[heuristic]]` (an ordered array of `{category, keywords}` - order matters, first match wins).
+- `src/data/categories.toml` - the curated data, embedded into the binary at compile time via `include_str!` (parsed once into a `OnceLock`). Two tables: `[curated]` (exact `package-name = "Category"` map) and `[[heuristic]]` (an ordered array of `{category, keywords, exclude}` - order matters, first match wins; `exclude` phrases veto a category even when a keyword matched).
+- `details.rs` - on-disk sizes (`package_size`, follows cask symlinks with a dev/ino cycle guard), install-age formatting, `dependency_tree`, `reverse_dependencies`, and `autoremove_candidates` (orphan fixpoint over direct + indirect edges; verified against `brew autoremove --dry-run`).
+- `cache.rs` - the fingerprinted package/outdated cache (`cache.json`, FNV-1a over Cellar + Caskroom + `<brew --cache>/api` listings) plus the persistent size map keyed `name|version` (survives fingerprint changes; pruned to installed versions on rewrite). Bump `CACHE_VERSION` whenever `Package` or the file shape changes.
 - `store.rs` - persists manual category overrides and notes (never raw package data) to a TOML file via the `directories` crate (e.g. `~/Library/Application Support/lagerregal/state.toml` on macOS).
-- `tui.rs` - the `ratatui`/`crossterm` interactive dashboard: category sidebar, package list, detail pane, plus inline note/category/filter editing.
+- `snapshot.rs` - named snapshots of installed packages/versions and their diffing.
+- `theme.rs` - Catppuccin Mocha palette (fixed RGB), Nerd-Font glyphs (Font Awesome range only, with plain-Unicode fallbacks) and the per-category style table, drift-guarded against `categories.toml` by a test.
+- `tui/` - the `ratatui`/`crossterm` dashboard, split by responsibility: `app.rs` (state, the `ListRow` row model - search results are grouped under category headings, so a table row index is *not* a package index; all selection/click paths go through `visible_rows`), `input.rs` (keyboard/mouse handlers and actions), `draw.rs` (all rendering), `mod.rs` (event loop, terminal setup, the suspend-and-run-`brew` seam), `tests.rs` (logic tests + `TestBackend` frame snapshots).
 
 ### Classification precedence
 
 In `classify::classify()`, highest wins:
 
-1. Manual override (from `store::State`, set via `lagerregal category <name> <category>` or the TUI's `c` key)
+1. Manual override (from `store::State`, set via `lagerregal category <name> <category>` or the TUI's `c` picker)
 2. Curated exact-name lookup (`categories.toml`'s `[curated]` table)
-3. Keyword heuristic - matched against **name + desc combined**, not desc alone. This matters: many packages (notably the thousands of `font-*` Homebrew casks) ship with no `desc` at all, only a name, so keywords like `font-` are designed to match on the name.
+3. Keyword heuristic - matched against **name + desc combined**, not desc alone. This matters: many packages (notably the thousands of `font-*` Homebrew casks) ship with no `desc` at all, only a name, so keywords like `font-` are designed to match on the name. Keywords of ≤4 characters must start at a word boundary; `exclude` phrases veto a category.
 4. Falls back to `"Uncategorized"`.
 
-When adding to `categories.toml`, prefer a new/expanded heuristic keyword over a pile of individual curated entries where possible - it generalizes to packages not yet seen. The curated list and heuristics were tuned by running the classifier against real data (a live user's `brew info --json=v2 --installed` output, and the full `homebrew-core`/`homebrew-cask` catalogs) rather than guessed; if you change the taxonomy, it's worth re-checking against `tests/fixtures/brew_installed.json` and, ideally, a larger real-world dump.
+When adding to `categories.toml`, prefer a new/expanded heuristic keyword over a pile of individual curated entries where possible - it generalizes to packages not yet seen. The curated list and heuristics were tuned by running the classifier against real data (a live user's `brew info --json=v2 --installed` output, and the full `homebrew-core`/`homebrew-cask` catalogs) rather than guessed; if you change the taxonomy, it's worth re-checking against `tests/fixtures/brew_installed.json` and, ideally, a larger real-world dump. (A longest-match-wins scheme was tried and rejected on measured results.)
 
 ### On-request vs. dependency filtering
 
-`Package.installed_on_request` distinguishes packages the user explicitly installed from ones pulled in only as a dependency of something else (casks are always treated as on-request; there's no such distinction for them in Homebrew). By default, `list`/`scan`/`categories` and the TUI only show on-request packages via `classify::filter_on_request` - dependency-only formulae are noise (in real-world data, roughly 2/3 of installed formulae are dependency-only). `--all` (CLI flag) / `d` (TUI key) opt back into the full set. `show <name>` always searches everything, unfiltered, since the user is asking about one specific package by name.
+`Package.installed_on_request` distinguishes packages the user explicitly installed from ones pulled in only as a dependency of something else (casks are always treated as on-request; there's no such distinction for them in Homebrew). By default, `list`/`scan`/`categories` and the TUI only show on-request packages via `classify::filter_on_request` - dependency-only formulae are noise (in real-world data, roughly 2/3 of installed formulae are dependency-only). `--all` (CLI flag) / `d` (TUI key) opt back into the full set. Exceptions that deliberately ignore the scoping: `show <name>` (one specific package by name), the TUI's search (`/` spans everything), and the Orphaned view / `orphans` subcommand (orphans are dependency-only by definition).
 
 ### Distribution
 
-Built with `cargo-dist` (`dist-workspace.toml`) targeting macOS only (`aarch64-apple-darwin` + `x86_64-apple-darwin`), publishing a generated Homebrew formula to a separate `homebrew-lagerregal` tap repo on tagged releases. This config was hand-verified against the actual `cargo-dist` 0.32.0 source (not run end-to-end, since installing `cargo-dist` and Homebrew itself aren't possible in this sandbox) - see the "Publishing to your own Homebrew tap" section in `README.md` for the manual one-time setup steps (creating the tap repo, `HOMEBREW_TAP_TOKEN` secret, running `cargo dist init`/`generate` on a real Mac).
+This repo is its own Homebrew tap: `.github/workflows/release.yml` builds `aarch64-apple-darwin` and `x86_64-apple-darwin` on tag push, uploads tarballs to the GitHub release, and regenerates `Formula/lagerregal.rb` on `main` (commit tagged `[skip ci]`). `brew tap admonstrator/lagerregal` works because the repo is named `homebrew-lagerregal`. CI (`ci.yml`) runs fmt/clippy/tests natively on both architectures. Releasing = bump `Cargo.toml` version, commit, `git tag vX.Y.Z && git push --tags`.

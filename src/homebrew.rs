@@ -33,6 +33,13 @@ pub struct Package {
     /// Names of this package's direct (declared) dependencies, resolved
     /// against other installed packages to build a dependency tree.
     pub dependencies: Vec<String>,
+    /// Runtime dependencies recorded in the install receipt that were *not*
+    /// declared directly - the transitive tail. Not shown in the dependency
+    /// tree (which walks direct edges), but essential for orphan analysis:
+    /// a package can be needed through an edge that exists only here, e.g.
+    /// when the formula that declared it directly was since uninstalled.
+    #[serde(default)]
+    pub indirect_dependencies: Vec<String>,
     /// The newer version available, if `brew outdated` reports one. `None`
     /// either means the package is up to date, or `apply_outdated` was never
     /// called (outdated-ness is opt-in - it needs its own `brew` call).
@@ -44,6 +51,12 @@ pub struct Package {
     /// set, since disabled is the more severe/final state.
     pub unmaintained: bool,
     pub unmaintained_reason: Option<String>,
+    /// Whether the user has run `brew pin` on this formula, freezing it at
+    /// its current version. Casks can't be pinned, so this is always
+    /// `false` for them. Defaults on deserialize so caches written before
+    /// the field existed still parse.
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,6 +86,8 @@ struct RawFormula {
     disabled: bool,
     #[serde(default)]
     disable_reason: Option<String>,
+    #[serde(default)]
+    pinned: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,13 +202,16 @@ pub fn parse_brew_json(bytes: &[u8]) -> Result<Vec<Package>> {
 
     for f in info.formulae {
         let install = f.installed.first();
-        let dependencies = install
+        let (dependencies, indirect_dependencies) = install
             .map(|i| {
-                i.runtime_dependencies
+                let (direct, indirect): (Vec<_>, Vec<_>) = i
+                    .runtime_dependencies
                     .iter()
-                    .filter(|d| d.declared_directly)
-                    .map(|d| short_name(&d.full_name))
-                    .collect()
+                    .partition(|d| d.declared_directly);
+                (
+                    direct.iter().map(|d| short_name(&d.full_name)).collect(),
+                    indirect.iter().map(|d| short_name(&d.full_name)).collect(),
+                )
             })
             .unwrap_or_default();
         let (unmaintained, unmaintained_reason) = unmaintained_status(
@@ -212,9 +230,11 @@ pub fn parse_brew_json(bytes: &[u8]) -> Result<Vec<Package>> {
             installed_on_request: install.map(|i| i.installed_on_request).unwrap_or(false),
             installed_at: install.and_then(|i| i.time),
             dependencies,
+            indirect_dependencies,
             outdated: None,
             unmaintained,
             unmaintained_reason,
+            pinned: f.pinned,
         });
     }
 
@@ -240,9 +260,12 @@ pub fn parse_brew_json(bytes: &[u8]) -> Result<Vec<Package>> {
             installed_on_request: true,
             installed_at: c.installed_time,
             dependencies,
+            indirect_dependencies: Vec::new(),
             outdated: None,
             unmaintained,
             unmaintained_reason,
+            // Casks can't be pinned.
+            pinned: false,
         });
     }
 
@@ -314,9 +337,39 @@ pub fn apply_outdated(packages: &mut [Package], outdated: &BTreeMap<String, Stri
 /// should treat a non-success exit status as "the upgrade failed" rather
 /// than an error to propagate, since `brew`'s own output already explains
 /// why.
+/// Runs `brew pin` or `brew unpin` for a formula. Unlike `upgrade`, output
+/// is captured rather than inherited - pinning is an instant metadata
+/// operation with nothing worth watching, and the TUI stays on screen.
+pub fn set_pinned(name: &str, pinned: bool) -> Result<()> {
+    let sub = if pinned { "pin" } else { "unpin" };
+    let output = Command::new("brew")
+        .arg(sub)
+        .arg(name)
+        .output()
+        .context("failed to run `brew` - is Homebrew installed and on PATH?")?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "brew {sub} {name}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(())
+}
+
 pub fn upgrade(kind: PackageKind, name: &str) -> Result<std::process::ExitStatus> {
+    run_inherited(kind, "upgrade", name)
+}
+
+/// Runs `brew uninstall` for a single package, with stdio inherited like
+/// `upgrade` - removal prints its own confirmation of what was deleted, and
+/// its own refusal when other installed packages still depend on the target.
+pub fn uninstall(kind: PackageKind, name: &str) -> Result<std::process::ExitStatus> {
+    run_inherited(kind, "uninstall", name)
+}
+
+fn run_inherited(kind: PackageKind, sub: &str, name: &str) -> Result<std::process::ExitStatus> {
     let mut cmd = Command::new("brew");
-    cmd.arg("upgrade");
+    cmd.arg(sub);
     if kind == PackageKind::Cask {
         cmd.arg("--cask");
     }
@@ -345,6 +398,12 @@ mod tests {
         assert_eq!(nmap.tap, "homebrew/core");
         assert!(nmap.desc.to_lowercase().contains("network"));
         assert!(!nmap.unmaintained);
+        assert!(!nmap.pinned, "pinned defaults to false when absent");
+
+        let openssl = packages.iter().find(|p| p.name == "openssl@3").unwrap();
+        assert!(openssl.pinned, "pinned is read from the brew JSON");
+        let wireshark = packages.iter().find(|p| p.name == "wireshark").unwrap();
+        assert!(!wireshark.pinned, "casks are never pinned");
     }
 
     #[test]
@@ -431,9 +490,11 @@ mod tests {
                 installed_on_request: true,
                 installed_at: None,
                 dependencies: Vec::new(),
+                indirect_dependencies: Vec::new(),
                 outdated: None,
                 unmaintained: false,
                 unmaintained_reason: None,
+                pinned: false,
             },
             Package {
                 name: "wireshark".into(),
@@ -445,9 +506,11 @@ mod tests {
                 installed_on_request: true,
                 installed_at: None,
                 dependencies: Vec::new(),
+                indirect_dependencies: Vec::new(),
                 outdated: None,
                 unmaintained: false,
                 unmaintained_reason: None,
+                pinned: false,
             },
         ];
         let mut outdated = BTreeMap::new();

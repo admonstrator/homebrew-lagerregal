@@ -6,9 +6,17 @@
       "tap": "homebrew/core",
       "desc": "Port scanning utility for large networks",
       "homepage": "https://nmap.org/",
-      "versions": { "stable": "7.94", "head": null, "bottle": true },
+      "versions": {
+        "stable": "7.94",
+        "head": null,
+        "bottle": true
+      },
       "installed": [
-        { "version": "7.94", "installed_as_dependency": false, "installed_on_request": true }
+        {
+          "version": "7.94",
+          "installed_as_dependency": false,
+          "installed_on_request": true
+        }
       ]
     },
     {
@@ -17,9 +25,17 @@
       "tap": "homebrew/core",
       "desc": "Implementation of the DNS protocols",
       "homepage": "https://www.isc.org/bind/",
-      "versions": { "stable": "9.18.24", "head": null, "bottle": true },
+      "versions": {
+        "stable": "9.18.24",
+        "head": null,
+        "bottle": true
+      },
       "installed": [
-        { "version": "9.18.24", "installed_as_dependency": false, "installed_on_request": true }
+        {
+          "version": "9.18.24",
+          "installed_as_dependency": false,
+          "installed_on_request": true
+        }
       ]
     },
     {
@@ -28,10 +44,19 @@
       "tap": "homebrew/core",
       "desc": "Cryptography and SSL/TLS Toolkit",
       "homepage": "https://openssl.org/",
-      "versions": { "stable": "3.2.1", "head": null, "bottle": true },
+      "versions": {
+        "stable": "3.2.1",
+        "head": null,
+        "bottle": true
+      },
       "installed": [
-        { "version": "3.2.1", "installed_as_dependency": true, "installed_on_request": false }
-      ]
+        {
+          "version": "3.2.1",
+          "installed_as_dependency": true,
+          "installed_on_request": false
+        }
+      ],
+      "pinned": true
     },
     {
       "name": "some-obscure-tool",
@@ -39,9 +64,17 @@
       "tap": "some-tap/repo",
       "desc": "Does something nobody has documented",
       "homepage": "https://example.com/",
-      "versions": { "stable": "0.1.0", "head": null, "bottle": false },
+      "versions": {
+        "stable": "0.1.0",
+        "head": null,
+        "bottle": false
+      },
       "installed": [
-        { "version": "0.1.0", "installed_as_dependency": false, "installed_on_request": true }
+        {
+          "version": "0.1.0",
+          "installed_as_dependency": false,
+          "installed_on_request": true
+        }
       ]
     }
   ],
@@ -50,7 +83,9 @@
       "token": "wireshark",
       "full_token": "wireshark",
       "tap": "homebrew/cask",
-      "name": ["Wireshark"],
+      "name": [
+        "Wireshark"
+      ],
       "desc": "Network traffic analyzer",
       "homepage": "https://www.wireshark.org/",
       "installed": "4.2.2"

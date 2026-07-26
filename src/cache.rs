@@ -12,7 +12,10 @@ use crate::store;
 /// Bumped whenever the shape of `Package` (or of this file) changes, so an
 /// older cache written by a previous build is discarded rather than
 /// deserialized into something subtly wrong.
-const CACHE_VERSION: u32 = 1;
+// v2: `Package` gained `pinned` and `indirect_dependencies`, and the file
+// gained the `sizes` map. Bumping discards pre-field caches wholesale
+// instead of relying on serde defaults to paper over the difference.
+const CACHE_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize)]
 struct CacheFile {
@@ -24,6 +27,14 @@ struct CacheFile {
     /// was up to date". Commands that don't need update info skip that call
     /// entirely, so the cache has to be able to represent the gap.
     outdated: Option<BTreeMap<String, String>>,
+    /// On-disk sizes previously computed by size-sorting, the detail pane,
+    /// or `categories --sizes`, keyed `name|version`. Sizes are expensive
+    /// (a full directory walk per package) and only change when the
+    /// installed version does - which changes the key - so unlike the rest
+    /// of this file they stay valid across fingerprint changes and are
+    /// carried over (pruned to still-installed versions) on every rewrite.
+    #[serde(default)]
+    sizes: BTreeMap<String, u64>,
 }
 
 pub struct Cached {
@@ -140,15 +151,102 @@ pub fn store(fingerprint: &str, packages: &[Package], outdated: Option<&BTreeMap
     for package in &mut packages {
         package.outdated = None;
     }
+    // A full rewrite would silently drop the accumulated size data, so it
+    // gets carried over from whatever file is being replaced.
+    let sizes = prune_sizes(read_sizes().unwrap_or_default(), &packages);
     let file = CacheFile {
         version: CACHE_VERSION,
         fingerprint: fingerprint.to_string(),
         packages,
         outdated: outdated.cloned(),
+        sizes,
     };
     if let Ok(json) = serde_json::to_string(&file) {
         let _ = fs::write(path, json);
     }
+}
+
+/// Cache key for a package's on-disk size. Versioned, so an upgrade
+/// naturally invalidates the old entry instead of serving a stale size.
+pub fn size_key(name: &str, version: &str) -> String {
+    format!("{name}|{version}")
+}
+
+/// Keeps only size entries whose `name|version` still corresponds to an
+/// installed package, so uninstalled or upgraded-away versions don't
+/// accumulate in the file forever.
+fn prune_sizes(sizes: BTreeMap<String, u64>, packages: &[Package]) -> BTreeMap<String, u64> {
+    let live: std::collections::HashSet<String> = packages
+        .iter()
+        .map(|p| size_key(&p.name, &p.version))
+        .collect();
+    sizes
+        .into_iter()
+        .filter(|(k, _)| live.contains(k))
+        .collect()
+}
+
+/// The raw sizes map from the cache file, if it exists and was written by
+/// this build. Deliberately ignores the fingerprint: size entries carry
+/// their own validity in the key (see `size_key`).
+fn read_sizes() -> Option<BTreeMap<String, u64>> {
+    let path = cache_path().ok()?;
+    let contents = fs::read_to_string(path).ok()?;
+    let cached: CacheFile = serde_json::from_str(&contents).ok()?;
+    (cached.version == CACHE_VERSION).then_some(cached.sizes)
+}
+
+/// Loads the persisted size map for seeding an in-memory lookup. A missing
+/// or unusable cache is just an empty map - sizes get recomputed on demand.
+pub fn load_sizes() -> BTreeMap<String, u64> {
+    read_sizes().unwrap_or_default()
+}
+
+/// Writes an updated size map back into the cache file, leaving everything
+/// else in it untouched. A missing or stale cache file is left alone - the
+/// next full `store` will persist the sizes then.
+pub fn merge_sizes(sizes: &BTreeMap<String, u64>) {
+    let Ok(path) = cache_path() else {
+        return;
+    };
+    let Ok(contents) = fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(mut cached) = serde_json::from_str::<CacheFile>(&contents) else {
+        return;
+    };
+    if cached.version != CACHE_VERSION {
+        return;
+    }
+    cached
+        .sizes
+        .extend(sizes.iter().map(|(k, v)| (k.clone(), *v)));
+    if let Ok(json) = serde_json::to_string(&cached) {
+        let _ = fs::write(path, json);
+    }
+}
+
+/// Cached-size lookup shared by the TUI and the CLI: returns the persisted
+/// size for this exact name+version if known, otherwise walks the package's
+/// install directory, records the result in `sizes`, and raises `dirty` so
+/// the caller knows there's something worth writing back via `merge_sizes`.
+pub fn size_or_compute(
+    sizes: &mut BTreeMap<String, u64>,
+    dirty: &mut bool,
+    kind: crate::homebrew::PackageKind,
+    name: &str,
+    version: &str,
+) -> Option<u64> {
+    let key = size_key(name, version);
+    if let Some(&s) = sizes.get(&key) {
+        return Some(s);
+    }
+    let size = details::package_size(kind, name, version);
+    if let Some(s) = size {
+        sizes.insert(key, s);
+        *dirty = true;
+    }
+    size
 }
 
 /// Deletes the cache file. Used by `--refresh` so a forced reload also
@@ -257,9 +355,11 @@ mod tests {
             installed_on_request: true,
             installed_at: None,
             dependencies: Vec::new(),
+            indirect_dependencies: Vec::new(),
             outdated: Some("7.99".into()),
             unmaintained: false,
             unmaintained_reason: None,
+            pinned: false,
         }];
 
         let mut outdated = BTreeMap::new();
@@ -278,6 +378,7 @@ mod tests {
                 p
             },
             outdated: Some(outdated),
+            sizes: BTreeMap::new(),
         };
 
         let json = serde_json::to_string(&file).unwrap();
@@ -291,6 +392,37 @@ mod tests {
             Some(&"7.99".to_string()),
             "the update map itself must survive alongside them"
         );
+    }
+
+    #[test]
+    fn prune_sizes_drops_entries_for_gone_or_upgraded_packages() {
+        use crate::homebrew::PackageKind;
+
+        let pkg = |name: &str, version: &str| Package {
+            name: name.into(),
+            kind: PackageKind::Formula,
+            desc: String::new(),
+            homepage: String::new(),
+            tap: String::new(),
+            version: version.into(),
+            installed_on_request: true,
+            installed_at: None,
+            dependencies: Vec::new(),
+            indirect_dependencies: Vec::new(),
+            outdated: None,
+            unmaintained: false,
+            unmaintained_reason: None,
+            pinned: false,
+        };
+
+        let mut sizes = BTreeMap::new();
+        sizes.insert(size_key("jq", "1.8"), 100);
+        sizes.insert(size_key("jq", "1.7"), 90); // upgraded away
+        sizes.insert(size_key("gone", "1.0"), 50); // uninstalled
+
+        let pruned = prune_sizes(sizes, &[pkg("jq", "1.8")]);
+        assert_eq!(pruned.len(), 1);
+        assert_eq!(pruned.get(&size_key("jq", "1.8")), Some(&100));
     }
 
     #[test]

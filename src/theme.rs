@@ -32,6 +32,7 @@ const SUBTEXT: Color = Color::Rgb(166, 173, 200);
 const OVERLAY: Color = Color::Rgb(108, 112, 134);
 const SURFACE: Color = Color::Rgb(49, 50, 68);
 const MANTLE: Color = Color::Rgb(24, 24, 37);
+const CRUST: Color = Color::Rgb(17, 17, 27);
 
 /// Accent color for focused-pane borders, the header brand, and highlights.
 pub const ACCENT: Color = MAUVE;
@@ -53,6 +54,15 @@ pub const UNCATEGORIZED: Color = OVERLAY;
 /// from red (which reads as an error/failure, not a heads-up).
 pub const OUTDATED: Color = PEACH;
 
+/// Orphaned packages (autoremove candidates) - informational rather than
+/// alarming: they cost disk space, but nothing is broken.
+pub const ORPHANED: Color = SKY;
+
+/// The matched substring inside live search results. Yellow like `MANUAL`,
+/// but always paired with bold and only ever mid-text, so the two never
+/// appear in a context where they could be mistaken for each other.
+pub const MATCH: Color = YELLOW;
+
 /// Alarm color for packages Homebrew itself has marked deprecated/disabled -
 /// deliberately red (unlike `OUTDATED`'s warm orange), since this is closer
 /// to "this may stop working" than "a newer version exists".
@@ -72,6 +82,13 @@ pub const HEADER_BG: Color = MANTLE;
 /// Selection uses `HIGHLIGHT_BG`, which is lighter, so the two never
 /// compete: stripes recede, the selected row comes forward.
 pub const ROW_ALT_BG: Color = MANTLE;
+
+/// Background for the category headings that break up grouped search
+/// results. Deliberately the darkest tone in the palette: the two other row
+/// backgrounds already sit above it (stripes at `ROW_ALT_BG`, the selected
+/// row at the lighter `HIGHLIGHT_BG`), so a heading reads as a groove
+/// between groups and can't be confused with either.
+pub const GROUP_BG: Color = CRUST;
 
 pub fn source_color(source: ClassificationSource) -> Color {
     match source {
@@ -166,6 +183,14 @@ pub fn sort_icon() -> &'static str {
 
 pub fn deps_icon() -> &'static str {
     icon("\u{f0e8}", "\u{2325}") //  / ⌥
+}
+
+pub fn pin_icon() -> &'static str {
+    icon("\u{f08d}", "\u{29bf}") //  / ⦿
+}
+
+pub fn orphan_icon() -> &'static str {
+    icon("\u{f1b8}", "\u{267b}") //  / ♻
 }
 
 pub fn note_icon() -> &'static str {
