@@ -3,18 +3,30 @@
 class Lagerregal < Formula
   desc "Classify and browse your installed Homebrew packages by category"
   homepage "https://github.com/admonstrator/homebrew-lagerregal"
-  version "0.3.0"
+  version "0.4.0"
   license "MIT"
 
-  if Hardware::CPU.arm?
-    url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.3.0/lagerregal-0.3.0-aarch64-apple-darwin.tar.gz"
-    sha256 "bda21e91dfcbd4caf7406bc4464bf20d51a72b09e14430ea55e057b8f712292c"
-  else
-    url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.3.0/lagerregal-0.3.0-x86_64-apple-darwin.tar.gz"
-    sha256 "b95412736cd582b6748bae8e4ff7c403d4f4bbd3d9ee9a972ca32fb8e6fed756"
+  on_macos do
+    on_arm do
+      url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.4.0/lagerregal-0.4.0-aarch64-apple-darwin.tar.gz"
+      sha256 "9bed2a09a3059ced6375383859c65f5802efddaade4f057e8eea2f0dac1b253d"
+    end
+    on_intel do
+      url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.4.0/lagerregal-0.4.0-x86_64-apple-darwin.tar.gz"
+      sha256 "ace013f6f1dc356a17420ccdad525e34376bba25c5cbf0b4970911e0b4748bcb"
+    end
   end
 
-  depends_on :macos
+  on_linux do
+    on_arm do
+      url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.4.0/lagerregal-0.4.0-aarch64-unknown-linux-musl.tar.gz"
+      sha256 "51d70a32510d8a8979350b8262257482acab88b3e55bbd8874c6c2cc4e4f84ef"
+    end
+    on_intel do
+      url "https://github.com/admonstrator/homebrew-lagerregal/releases/download/v0.4.0/lagerregal-0.4.0-x86_64-unknown-linux-musl.tar.gz"
+      sha256 "374d18bf16590316ec055a59f833a877fef82d98b60ff18693607f23b675c999"
+    end
+  end
 
   def install
     bin.install "lagerregal"
