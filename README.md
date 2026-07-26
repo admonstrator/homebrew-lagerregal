@@ -4,7 +4,7 @@ A CLI and TUI for your installed [Homebrew](https://brew.sh) packages: classifie
 
 Homebrew has no concept of categories or tags. `lagerregal` fills that gap.
 
-> **Apple Silicon only.** Builds and releases target `aarch64-apple-darwin`.
+> **macOS only.** Builds and releases target both `aarch64-apple-darwin` (Apple Silicon) and `x86_64-apple-darwin` (Intel).
 
 ## Installation
 
@@ -164,7 +164,7 @@ cargo fmt
 
 Homebrew JSON parsing, classification, the cache fingerprint, and the theme's category table all run against fixtures or temp directories rather than a real `brew`, so the test suite runs anywhere Rust does. Exercising the actual `brew` shell-outs and the TUI's rendering needs a Mac with Homebrew installed.
 
-CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request.
+CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request, natively on both `aarch64-apple-darwin` (`macos-latest`) and `x86_64-apple-darwin` (`macos-15-intel` — GitHub's last Intel macOS image, retiring alongside macOS 15 support around fall 2027) so neither architecture is just assumed to work.
 
 ## Releasing
 

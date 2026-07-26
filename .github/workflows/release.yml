@@ -6,7 +6,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  TARGET: aarch64-apple-darwin
 
 jobs:
   release:
@@ -42,24 +41,47 @@ jobs:
             exit 1
           fi
 
-      - name: Build
-        run: cargo build --release --target "$TARGET"
+      # Both Mac architectures ship from this one Apple Silicon runner:
+      # Xcode's toolchain links x86_64-apple-darwin just fine from an arm64
+      # host, so there's no need for a second runner (and no need for
+      # GitHub's Intel image, which is on a retirement clock) just to
+      # produce the release artifact. CI separately builds+tests each
+      # target natively, so correctness on real hardware is already covered.
+      - name: Add x86_64-apple-darwin target
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Build aarch64-apple-darwin
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Build x86_64-apple-darwin
+        run: cargo build --release --target x86_64-apple-darwin
 
       - name: Package
         id: package
         run: |
           version="${{ steps.version.outputs.version }}"
-          archive="lagerregal-${version}-${TARGET}.tar.gz"
-          tar -czf "$archive" -C "target/${TARGET}/release" lagerregal
-          sha="$(shasum -a 256 "$archive" | cut -d' ' -f1)"
-          echo "archive=$archive" >> "$GITHUB_OUTPUT"
-          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
-          echo "$sha  $archive"
+
+          arm_archive="lagerregal-${version}-aarch64-apple-darwin.tar.gz"
+          tar -czf "$arm_archive" -C "target/aarch64-apple-darwin/release" lagerregal
+          arm_sha="$(shasum -a 256 "$arm_archive" | cut -d' ' -f1)"
+          echo "arm_archive=$arm_archive" >> "$GITHUB_OUTPUT"
+          echo "arm_sha256=$arm_sha" >> "$GITHUB_OUTPUT"
+
+          intel_archive="lagerregal-${version}-x86_64-apple-darwin.tar.gz"
+          tar -czf "$intel_archive" -C "target/x86_64-apple-darwin/release" lagerregal
+          intel_sha="$(shasum -a 256 "$intel_archive" | cut -d' ' -f1)"
+          echo "intel_archive=$intel_archive" >> "$GITHUB_OUTPUT"
+          echo "intel_sha256=$intel_sha" >> "$GITHUB_OUTPUT"
+
+          echo "$arm_sha  $arm_archive"
+          echo "$intel_sha  $intel_archive"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.package.outputs.archive }}
+          files: |
+            ${{ steps.package.outputs.arm_archive }}
+            ${{ steps.package.outputs.intel_archive }}
           generate_release_notes: true
 
       # This repo doubles as its own Homebrew tap: the formula lives here
@@ -71,9 +93,10 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           version="${{ steps.version.outputs.version }}"
-          archive="${{ steps.package.outputs.archive }}"
-          sha="${{ steps.package.outputs.sha256 }}"
-          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${archive}"
+          arm_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.package.outputs.arm_archive }}"
+          arm_sha="${{ steps.package.outputs.arm_sha256 }}"
+          intel_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.package.outputs.intel_archive }}"
+          intel_sha="${{ steps.package.outputs.intel_sha256 }}"
 
           git checkout "$DEFAULT_BRANCH"
           mkdir -p Formula
@@ -83,13 +106,18 @@ jobs:
           class Lagerregal < Formula
             desc "Classify and browse your installed Homebrew packages by category"
             homepage "https://github.com/${GITHUB_REPOSITORY}"
-            url "${url}"
-            sha256 "${sha}"
             version "${version}"
             license "MIT"
 
+            if Hardware::CPU.arm?
+              url "${arm_url}"
+              sha256 "${arm_sha}"
+            else
+              url "${intel_url}"
+              sha256 "${intel_sha}"
+            end
+
             depends_on :macos
-            depends_on arch: :arm64
 
             def install
               bin.install "lagerregal"
