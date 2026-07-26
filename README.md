@@ -11,11 +11,11 @@ Homebrew has no concept of categories or tags. `lagerregal` fills that gap.
 ## Installation
 
 ```sh
-brew tap admonstrator/lagerregal
+brew tap admonstrator/tap
 brew install lagerregal
 ```
 
-This repository *is* the tap: it's named `homebrew-lagerregal`, which is what `brew tap admonstrator/lagerregal` resolves to, and the generated formula lives here under `Formula/`. So there's no second repository to maintain and no access token to manage — the release workflow updates the formula with its own built-in `GITHUB_TOKEN`.
+The formula is generated and maintained in [`admonstrator/homebrew-tap`](https://github.com/admonstrator/homebrew-tap), the shared tap for everything I distribute via Homebrew. This repo's release workflow pushes the regenerated formula there on every tagged release.
 
 Or from source:
 
@@ -220,11 +220,11 @@ git push origin v0.1.0
 1. checks that the tag matches the version in `Cargo.toml`, failing loudly if it doesn't;
 2. builds all four target binaries — two macOS, two Linux — each on a runner of its own architecture, and packages each as a tarball;
 3. publishes a GitHub Release with all four tarballs attached;
-4. regenerates `Formula/lagerregal.rb` with the per-platform URLs and their SHA-256 sums, and commits it to the default branch.
+4. regenerates `Formula/lagerregal.rb` with the per-platform URLs and their SHA-256 sums, and pushes it to the `main` branch of [`admonstrator/homebrew-tap`](https://github.com/admonstrator/homebrew-tap).
 
 Checksums are taken in the release job rather than per build, so they all come from one `sha256sum` on one runner — `shasum` and `sha256sum` differ across the macOS and Linux images, and a formula is only as good as its hashes.
 
-No setup or secrets are required — the formula lives in this repo, so the workflow's built-in `GITHUB_TOKEN` is enough to update it. `Formula/lagerregal.rb` is generated, not hand-maintained; change the workflow rather than the file.
+Since the formula lives in a different repo, the built-in `GITHUB_TOKEN` (scoped to this repo only) isn't enough to push it. The workflow uses `GH_TAP_PAT`, a fine-grained Personal Access Token scoped to `contents: write` on `homebrew-tap` only, stored as a secret on this repo. The formula itself is generated, not hand-maintained; change the workflow rather than editing it in `homebrew-tap` directly.
 
 ## License
 
