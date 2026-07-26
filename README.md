@@ -97,13 +97,16 @@ Mouse capture is released while `brew upgrade` owns the terminal, so your termin
 
 The TUI uses the [Catppuccin Mocha](https://catppuccin.com) palette — fixed RGB values rather than the terminal's ANSI slots, so hues stay balanced regardless of your colorscheme.
 
-Everything carries meaning through both an icon and a color:
+Colour is spent where it earns its keep, rather than everywhere at once:
 
-- **Each category** has its own glyph and color, used consistently across sidebar, list, and detail pane.
-- **Formula vs. cask** is a terminal vs. monitor glyph, tinted by classification source (manual / curated / heuristic / uncategorized).
-- **Status markers**: update available, no longer maintained, manually classified, multi-selected.
+- **Status is what colour is for.** Update available, no longer maintained, manually classified, multi-selected — these are the things that light up. Package names and category labels stay neutral so the markers actually register.
+- **Each category** has its own glyph and colour, but in the list only the glyph is tinted. A whole column in nineteen competing hues reads as noise; one character is enough to tie a row to its sidebar entry.
+- **Formula vs. cask** is a terminal vs. monitor glyph. Just the one meaning — it used to be tinted by classification source as well, and a character carrying two unrelated meanings read as neither.
 - **On-disk size** is traffic-lighted green → yellow → orange → red.
+- **Alternating row backgrounds**, one step off the terminal's own, guide the eye across a wide row. The selected row uses a lighter tone and is painted afterwards, so the two never compete.
 - The header carries live counts plus a bar showing what share of your install is current.
+
+The sidebar hides categories with nothing in them (All, Outdated and Unmaintained always stay, since "0" is a useful answer there), and the multi-select gutter only appears once something is selected — so the default view spends its width on packages.
 
 Icons are [Nerd Font](https://www.nerdfonts.com) glyphs from the Font Awesome range that every Nerd Font release ships. Without a Nerd Font they'd render as tofu boxes, so there's a fallback:
 
@@ -143,6 +146,13 @@ Precedence, highest wins:
 3. **Keyword heuristic** — matched against the package's name *and* description, so the thousands of `font-*` casks that carry no description still classify from their name
 4. **Uncategorized** — fallback
 
+Two rules keep the keyword matching from firing on coincidences:
+
+- **Short keywords must start at a word boundary.** Anything four characters or fewer collides by accident otherwise — `ssl` inside "lossless" filed compression tools under Cryptography, `dns` inside "cjdns" filed a mesh router under DNS. Growth to the right is still allowed, so `emulat` keeps matching "emulator", and longer keywords may still match mid-word, which several rely on (`compiler` inside "decompiler").
+- **Heuristics can veto themselves** with an `exclude` list, for stems that mean something else in a specific context. `emulat` is right for game emulators and wrong for a *terminal* emulator; `video` is right for media tools and wrong for a *videogame*.
+
+Both were derived by measuring against the full catalogue rather than guessing. A tempting alternative — letting the longest matching keyword win — was tried and rejected on the numbers: on a real 184-package install it improved three classifications and broke five, because length isn't specificity ("terminal" is eight characters and a weak signal).
+
 Built-in categories: Security, AI & Machine Learning, DNS, Cryptography, Cryptocurrency, Networking, Media & Graphics, Fonts, Documents & PDF, Monitoring, Databases, Cloud & Infra, Dev Tools & Languages, System Utilities, Communication & Browsers, Games & Emulation, Archives & Compression, Peripherals & Input, Productivity. You aren't limited to these — `lagerregal category <name> <anything>` accepts any name.
 
 The curated list and keywords were tuned against the full official catalog (~8,500 [homebrew-core](https://github.com/Homebrew/homebrew-core) formulae and ~7,700 [homebrew-cask](https://github.com/Homebrew/homebrew-cask) casks) as well as a real ~180-package install, where they reach 0 `Uncategorized`. Against the *entire* catalog a large `Uncategorized` tail remains, which is expected: it's dominated by narrow single-purpose libraries nobody installs directly. The goal is covering what people actually install, not inventing a category for every library in existence.
@@ -179,8 +189,8 @@ git push origin v0.1.0
 `.github/workflows/release.yml` then:
 
 1. checks that the tag matches the version in `Cargo.toml`, failing loudly if it doesn't;
-2. builds the `aarch64-apple-darwin` binary and packages it as a tarball;
-3. publishes a GitHub Release with that tarball attached;
+2. builds both the `aarch64-apple-darwin` and `x86_64-apple-darwin` binaries and packages each as a tarball;
+3. publishes a GitHub Release with both tarballs attached;
 4. regenerates `Formula/lagerregal.rb` with the release URL and its SHA-256, and commits it to the default branch.
 
 No setup or secrets are required — the formula lives in this repo, so the workflow's built-in `GITHUB_TOKEN` is enough to update it. `Formula/lagerregal.rb` is generated, not hand-maintained; change the workflow rather than the file.
