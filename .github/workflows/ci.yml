@@ -18,9 +18,10 @@ env:
 jobs:
   check:
     name: check (${{ matrix.target }})
-    # Both Mac architectures this project ships for, each built and tested
-    # natively (no cross-compilation, no Rosetta) so a target only counts as
-    # working once it has actually run on that hardware.
+    # Every target this project ships for, each built and tested on a runner
+    # of its own architecture (no cross-compilation, no Rosetta, no QEMU) so
+    # a target only counts as working once it has actually run on that
+    # hardware. The Linux legs use musl to match what the release ships.
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -33,11 +34,17 @@ jobs:
             # support (~fall 2027). Re-check actions/runner-images if this
             # label ever stops working.
             runner: macos-15-intel
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        run: rustup component add clippy rustfmt
+        run: |
+          rustup component add clippy rustfmt
+          rustup target add ${{ matrix.target }}
 
       - name: Cache cargo registry and build artifacts
         uses: actions/cache@v4
@@ -53,18 +60,21 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --target ${{ matrix.target }} -- -D warnings
 
+      # The runner's architecture always matches the target, so these run
+      # rather than just cross-compile - including the musl legs, whose
+      # statically linked test binaries execute fine on a glibc host.
       - name: Tests
-        run: cargo test
+        run: cargo test --target ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
 
       # Cheap smoke test: the binary should at least start and answer --help
       # without a Homebrew install present. Anything that actually shells out
       # to `brew` is deliberately left to the local test suite.
       - name: Smoke test
         run: |
-          ./target/release/lagerregal --version
-          ./target/release/lagerregal --help
+          ./target/${{ matrix.target }}/release/lagerregal --version
+          ./target/${{ matrix.target }}/release/lagerregal --help

@@ -8,8 +8,73 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # One runner per target, each building natively for the platform it ships
+  # to. The Linux targets are musl rather than gnu on purpose: the binary
+  # links statically, so it doesn't inherit the glibc version of whatever
+  # runner image built it and runs on old and new distributions alike.
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+          - target: x86_64-apple-darwin
+            # Cross-linked from the Apple Silicon image; Xcode's toolchain
+            # handles this fine, and CI has already built and tested this
+            # target on real Intel hardware.
+            runner: macos-latest
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version"
+
+      # A tag whose version disagrees with Cargo.toml would ship a binary
+      # that reports a different version than the formula installs. Catch it
+      # here rather than after publishing - a failure in any matrix leg
+      # leaves the release job with nothing to publish.
+      - name: Verify tag matches Cargo.toml version
+        run: |
+          manifest="$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
+          if [ "$manifest" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::tag ${{ github.ref_name }} does not match Cargo.toml version $manifest"
+            exit 1
+          fi
+
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          archive="lagerregal-${version}-${{ matrix.target }}.tar.gz"
+          tar -czf "$archive" -C "target/${{ matrix.target }}/release" lagerregal
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lagerregal-${{ matrix.target }}
+          path: lagerregal-*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
   release:
-    runs-on: macos-latest
+    needs: build
+    runs-on: ubuntu-latest
     permissions:
       # Creating the Release, and committing the regenerated formula back to
       # the default branch. Both are in this repo, so the built-in
@@ -24,64 +89,36 @@ jobs:
 
       - name: Derive version from tag
         id: version
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Releasing $version"
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      # A tag whose version disagrees with Cargo.toml would ship a binary
-      # that reports a different version than the formula installs. Catch it
-      # here rather than after publishing.
-      - name: Verify tag matches Cargo.toml version
-        run: |
-          manifest="$(cargo metadata --no-deps --format-version 1 \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
-          if [ "$manifest" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::error::tag ${{ github.ref_name }} does not match Cargo.toml version $manifest"
-            exit 1
-          fi
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
-      # Both Mac architectures ship from this one Apple Silicon runner:
-      # Xcode's toolchain links x86_64-apple-darwin just fine from an arm64
-      # host, so there's no need for a second runner (and no need for
-      # GitHub's Intel image, which is on a retirement clock) just to
-      # produce the release artifact. CI separately builds+tests each
-      # target natively, so correctness on real hardware is already covered.
-      - name: Add x86_64-apple-darwin target
-        run: rustup target add x86_64-apple-darwin
-
-      - name: Build aarch64-apple-darwin
-        run: cargo build --release --target aarch64-apple-darwin
-
-      - name: Build x86_64-apple-darwin
-        run: cargo build --release --target x86_64-apple-darwin
-
-      - name: Package
-        id: package
+      # Checksums are taken here rather than per-target so they all come from
+      # one tool on one runner - `shasum` vs `sha256sum` differ across the
+      # macOS and Linux images, and a formula is only as good as its hashes.
+      - name: Checksum artifacts
+        id: sums
         run: |
           version="${{ steps.version.outputs.version }}"
-
-          arm_archive="lagerregal-${version}-aarch64-apple-darwin.tar.gz"
-          tar -czf "$arm_archive" -C "target/aarch64-apple-darwin/release" lagerregal
-          arm_sha="$(shasum -a 256 "$arm_archive" | cut -d' ' -f1)"
-          echo "arm_archive=$arm_archive" >> "$GITHUB_OUTPUT"
-          echo "arm_sha256=$arm_sha" >> "$GITHUB_OUTPUT"
-
-          intel_archive="lagerregal-${version}-x86_64-apple-darwin.tar.gz"
-          tar -czf "$intel_archive" -C "target/x86_64-apple-darwin/release" lagerregal
-          intel_sha="$(shasum -a 256 "$intel_archive" | cut -d' ' -f1)"
-          echo "intel_archive=$intel_archive" >> "$GITHUB_OUTPUT"
-          echo "intel_sha256=$intel_sha" >> "$GITHUB_OUTPUT"
-
-          echo "$arm_sha  $arm_archive"
-          echo "$intel_sha  $intel_archive"
+          for target in aarch64-apple-darwin x86_64-apple-darwin \
+                        aarch64-unknown-linux-musl x86_64-unknown-linux-musl; do
+            archive="dist/lagerregal-${version}-${target}.tar.gz"
+            if [ ! -f "$archive" ]; then
+              echo "::error::missing build artifact $archive"
+              exit 1
+            fi
+            sha="$(sha256sum "$archive" | cut -d' ' -f1)"
+            echo "${target//-/_}=$sha" >> "$GITHUB_OUTPUT"
+            echo "$sha  $archive"
+          done
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ${{ steps.package.outputs.arm_archive }}
-            ${{ steps.package.outputs.intel_archive }}
+          files: dist/*.tar.gz
           generate_release_notes: true
 
       # This repo doubles as its own Homebrew tap: the formula lives here
@@ -93,10 +130,7 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           version="${{ steps.version.outputs.version }}"
-          arm_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.package.outputs.arm_archive }}"
-          arm_sha="${{ steps.package.outputs.arm_sha256 }}"
-          intel_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.package.outputs.intel_archive }}"
-          intel_sha="${{ steps.package.outputs.intel_sha256 }}"
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
 
           git checkout "$DEFAULT_BRANCH"
           mkdir -p Formula
@@ -109,15 +143,27 @@ jobs:
             version "${version}"
             license "MIT"
 
-            if Hardware::CPU.arm?
-              url "${arm_url}"
-              sha256 "${arm_sha}"
-            else
-              url "${intel_url}"
-              sha256 "${intel_sha}"
+            on_macos do
+              on_arm do
+                url "${base}/lagerregal-${version}-aarch64-apple-darwin.tar.gz"
+                sha256 "${{ steps.sums.outputs.aarch64_apple_darwin }}"
+              end
+              on_intel do
+                url "${base}/lagerregal-${version}-x86_64-apple-darwin.tar.gz"
+                sha256 "${{ steps.sums.outputs.x86_64_apple_darwin }}"
+              end
             end
 
-            depends_on :macos
+            on_linux do
+              on_arm do
+                url "${base}/lagerregal-${version}-aarch64-unknown-linux-musl.tar.gz"
+                sha256 "${{ steps.sums.outputs.aarch64_unknown_linux_musl }}"
+              end
+              on_intel do
+                url "${base}/lagerregal-${version}-x86_64-unknown-linux-musl.tar.gz"
+                sha256 "${{ steps.sums.outputs.x86_64_unknown_linux_musl }}"
+              end
+            end
 
             def install
               bin.install "lagerregal"
