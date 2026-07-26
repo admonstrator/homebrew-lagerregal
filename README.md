@@ -40,6 +40,7 @@ lagerregal categories                    # all categories with package counts
 lagerregal categories --sizes            # ...plus total on-disk size per category
 lagerregal outdated                      # packages with an update available
 lagerregal unmaintained                  # packages Homebrew marked deprecated/disabled
+lagerregal orphans                       # dependency-only packages nothing needs anymore
 lagerregal update <name>                 # upgrade one package via `brew upgrade`
 lagerregal snapshot save [name]          # snapshot current packages + versions
 lagerregal snapshot diff [name]          # compare against a saved snapshot
@@ -49,7 +50,7 @@ Global flags: `--refresh` (bypass the cache), `--no-icons` (plain Unicode instea
 
 By default only packages you explicitly installed are shown — the C libraries Homebrew pulled in as dependencies are hidden. Pass `--all`, or press `d` in the TUI, to include them.
 
-`show` prints on-disk size, install date, publishing tap, update status, deprecation status, and a recursive dependency tree.
+`show` prints on-disk size, install date, publishing tap, update status, deprecation status, a recursive dependency tree, and the reverse view — which installed packages require this one.
 
 Snapshots are useful around a reinstall or cleanup: `snapshot save before-cleanup`, do your thing, then `snapshot diff before-cleanup` to see exactly what was added, removed, or changed version.
 
@@ -59,12 +60,15 @@ Snapshots are useful around a reinstall or cleanup: `snapshot save before-cleanu
 |-----|--------|
 | `Tab` | Switch focus between sidebar and package list |
 | `↑`/`↓`, `j`/`k` | Move selection |
-| `/` | Filter by name, description, or note |
+| `/` | Search all categories, live while you type |
 | `s` | Cycle sort order: name / size / install date |
-| `Enter` | Open the action menu for the selected package |
+| `r` | Refresh package data from `brew` without restarting |
+| `Enter` | Open the action menu for the selected package (incl. uninstall) |
 | `u` | Update selected package(s) via `brew upgrade` (asks first) |
+| `U` | Update everything outdated at once (pinned packages are skipped) |
+| `p` | Pin/unpin a formula (`brew pin`) — pinned packages are left out of updates |
 | `n` | Add/edit a note |
-| `c` | Set category (applies to all multi-selected) |
+| `c` | Pick a category from a filterable list (applies to all multi-selected) |
 | `R` | Clear a manual category override |
 | `o` | Open the package's homepage |
 | `y` | Copy the package name to the clipboard |
@@ -74,11 +78,28 @@ Snapshots are useful around a reinstall or cleanup: `snapshot save before-cleanu
 | `Esc` | Clear selection, cancel input, or quit |
 | `q` | Quit |
 
-The sidebar has two pseudo-categories pinned above the taxonomy — **Outdated** and **Unmaintained** — that filter to exactly those packages. They're views, not real categories: selecting one doesn't change any package's classification.
+The sidebar has three pseudo-categories pinned above the taxonomy — **Outdated**, **Unmaintained**, and **Orphaned** — that filter to exactly those packages. They're views, not real categories: selecting one doesn't change any package's classification. **Orphaned** shows dependency-only packages that nothing installed still needs (what `brew autoremove` would remove); it's the one view that ignores the dependency toggle, since orphans are by definition dependency-only. The analysis walks the full runtime-dependency edge set from Homebrew's install receipts — including transitive entries whose direct declarer is long uninstalled — and was checked against `brew autoremove --dry-run` on a real install.
 
-`u` is the one action that changes your Homebrew install, so it always confirms first, then hands the terminal over to `brew` so its own progress output renders normally. Press Enter when it's done to return; the list refreshes automatically.
+Search (`/`) deliberately ignores the sidebar: you reach for it precisely when you *don't* know which category a package sits in, so scoping the search to one would hide the answer. Instead every category is searched and the hits come back grouped under category headings — biggest group first, so the category that best answers the search is at the top. The list narrows with every keystroke, the matched text is highlighted in each row, and Esc restores whatever was there before you started typing:
 
-Multi-select (`Space`) drives bulk operations: tick off a run of packages, then `c` to categorize them all at once, `R` to reset their overrides, or `u` to update every outdated one together.
+```
+ Packages  ⌕ file  17 matches in 8 categories
+   Archives & Compression · 4
+     cabextract     1.11      Extract files from Microsoft cabinet files
+     keka           1.6.7     File archiver
+     …
+   Documents & PDF · 3
+     archivewebpage 0.16.2    Archive webpages manually to WARC or WACZ files
+     …
+```
+
+Headings are skipped by `j`/`k` and clicking one drops the cursor on the first package below it. Clearing the search puts you back in whatever category the sidebar was on.
+
+The detail pane shows each package's dependencies as a tree and, next to it, **Required by** — the reverse edge, which for anything that arrived as a dependency is the whole answer to "why is this installed?".
+
+Updating (`u`/`U`) and uninstalling (via the action menu) are the actions that change your Homebrew install, so both always confirm first — uninstall in unmissable red — then hand the terminal over to `brew` so its own progress output renders normally. Press Enter when it's done to return; the list refreshes automatically.
+
+Multi-select (`Space`) drives bulk operations: tick off a run of packages, then `c` to categorize them all at once, `R` to reset their overrides, `u` to update every outdated one together, or uninstall the lot from the action menu.
 
 ### Mouse
 
@@ -137,6 +158,10 @@ The cache lives at `~/Library/Application Support/lagerregal/cache.json`, valida
 
 Computing the fingerprint costs ~1ms against the ~2.9s it skips. A cache that's missing, corrupt, or written by an older build is ignored rather than surfaced as an error — a cache should cost you time, never correctness. Force a reload with `--refresh`.
 
+**On-disk sizes are cached too.** Walking a package's install directory is the expensive part of size-sorting and `categories --sizes` (seconds across a whole install), but a size only changes when the installed version does — so every computed size is persisted keyed by `name|version`, which makes each entry self-invalidating on upgrade. First `categories --sizes` run: ~4.7s; every one after: ~0.05s. The TUI seeds its size lookups from the same store and writes anything newly computed back on exit.
+
+The TUI can also re-read everything mid-session with `r`, which bypasses the cache the same way `--refresh` does.
+
 ## How classification works
 
 Precedence, highest wins:
@@ -172,7 +197,9 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt
 ```
 
-Homebrew JSON parsing, classification, the cache fingerprint, and the theme's category table all run against fixtures or temp directories rather than a real `brew`, so the test suite runs anywhere Rust does. Exercising the actual `brew` shell-outs and the TUI's rendering needs a Mac with Homebrew installed.
+Homebrew JSON parsing, classification, the cache fingerprint, and the theme's category table all run against fixtures or temp directories rather than a real `brew`, so the test suite runs anywhere Rust does. The TUI is covered two ways: its selection/search/grouping logic by plain unit tests, and whole rendered frames via ratatui's `TestBackend` — full screens drawn into an in-memory buffer and asserted on, so layout regressions fail in `cargo test` instead of waiting to be noticed in a terminal. Exercising the actual `brew` shell-outs still needs a Mac with Homebrew installed.
+
+The TUI lives in `src/tui/` split by responsibility — `app.rs` (state + row model), `input.rs` (keyboard/mouse), `draw.rs` (rendering) — with the event loop in `mod.rs`. Built on ratatui 0.30 / crossterm 0.29.
 
 CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request, natively on both `aarch64-apple-darwin` (`macos-latest`) and `x86_64-apple-darwin` (`macos-15-intel` — GitHub's last Intel macOS image, retiring alongside macOS 15 support around fall 2027) so neither architecture is just assumed to work.
 
