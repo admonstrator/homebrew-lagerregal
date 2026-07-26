@@ -4,7 +4,9 @@ A CLI and TUI for your installed [Homebrew](https://brew.sh) packages: classifie
 
 Homebrew has no concept of categories or tags. `lagerregal` fills that gap.
 
-> **macOS only.** Builds and releases target both `aarch64-apple-darwin` (Apple Silicon) and `x86_64-apple-darwin` (Intel).
+> **macOS and Linux.** Releases target `aarch64-apple-darwin` and `x86_64-apple-darwin` on macOS, plus `aarch64-unknown-linux-musl` and `x86_64-unknown-linux-musl` on Linux — statically linked, so they don't depend on the host's glibc version.
+>
+> On Linux, Homebrew has no casks, so `lagerregal` sees formulae only. Everything else works the same; the category taxonomy just leans heavily on casks, so expect a thinner picture than on a Mac.
 
 ## Installation
 
@@ -201,7 +203,7 @@ Homebrew JSON parsing, classification, the cache fingerprint, and the theme's ca
 
 The TUI lives in `src/tui/` split by responsibility — `app.rs` (state + row model), `input.rs` (keyboard/mouse), `draw.rs` (rendering) — with the event loop in `mod.rs`. Built on ratatui 0.30 / crossterm 0.29.
 
-CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request, natively on both `aarch64-apple-darwin` (`macos-latest`) and `x86_64-apple-darwin` (`macos-15-intel` — GitHub's last Intel macOS image, retiring alongside macOS 15 support around fall 2027) so neither architecture is just assumed to work.
+CI (`.github/workflows/ci.yml`) runs the same four commands on every push and pull request, once per shipped target and always on a runner of that target's own architecture, so no platform is just assumed to work: `aarch64-apple-darwin` (`macos-latest`), `x86_64-apple-darwin` (`macos-15-intel` — GitHub's last Intel macOS image, retiring alongside macOS 15 support around fall 2027), `aarch64-unknown-linux-musl` (`ubuntu-24.04-arm`) and `x86_64-unknown-linux-musl` (`ubuntu-latest`).
 
 ## Releasing
 
@@ -216,9 +218,11 @@ git push origin v0.1.0
 `.github/workflows/release.yml` then:
 
 1. checks that the tag matches the version in `Cargo.toml`, failing loudly if it doesn't;
-2. builds both the `aarch64-apple-darwin` and `x86_64-apple-darwin` binaries and packages each as a tarball;
-3. publishes a GitHub Release with both tarballs attached;
-4. regenerates `Formula/lagerregal.rb` with the release URL and its SHA-256, and commits it to the default branch.
+2. builds all four target binaries — two macOS, two Linux — each on a runner of its own architecture, and packages each as a tarball;
+3. publishes a GitHub Release with all four tarballs attached;
+4. regenerates `Formula/lagerregal.rb` with the per-platform URLs and their SHA-256 sums, and commits it to the default branch.
+
+Checksums are taken in the release job rather than per build, so they all come from one `sha256sum` on one runner — `shasum` and `sha256sum` differ across the macOS and Linux images, and a formula is only as good as its hashes.
 
 No setup or secrets are required — the formula lives in this repo, so the workflow's built-in `GITHUB_TOKEN` is enough to update it. `Formula/lagerregal.rb` is generated, not hand-maintained; change the workflow rather than the file.
 

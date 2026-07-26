@@ -1,6 +1,6 @@
 [package]
 name = "lagerregal"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 description = "Classify and browse your installed Homebrew packages by category"
 license = "MIT"
