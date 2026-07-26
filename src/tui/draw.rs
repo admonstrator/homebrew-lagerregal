@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::symbols;
@@ -11,7 +12,6 @@ use ratatui::widgets::{
     Block, BorderType, Borders, Cell, Clear, LineGauge, List, ListItem, Paragraph, Row, Scrollbar,
     ScrollbarOrientation, ScrollbarState, Table, Wrap,
 };
-use ratatui::Frame;
 
 use crate::classify::{ClassificationSource, ClassifiedPackage};
 use crate::details;
@@ -672,29 +672,29 @@ pub(super) fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
     // package reference for line-building below - keeps the two mutable /
     // immutable uses of `app` from overlapping.
     let selected_name = app.selected_package().map(|p| p.package.name.clone());
-    if let Some(name) = &selected_name {
-        if app.size_cache.as_ref().map(|(n, _)| n) != Some(name) {
-            let found = app
-                .packages
-                .iter()
-                .find(|p| &p.package.name == name)
-                .map(|p| {
-                    (
-                        p.package.kind,
-                        p.package.name.clone(),
-                        p.package.version.clone(),
-                    )
-                });
-            if let Some((kind, name, version)) = found {
-                let size = crate::cache::size_or_compute(
-                    &mut app.disk_sizes,
-                    &mut app.disk_sizes_dirty,
-                    kind,
-                    &name,
-                    &version,
-                );
-                app.size_cache = Some((name, size));
-            }
+    if let Some(name) = &selected_name
+        && app.size_cache.as_ref().map(|(n, _)| n) != Some(name)
+    {
+        let found = app
+            .packages
+            .iter()
+            .find(|p| &p.package.name == name)
+            .map(|p| {
+                (
+                    p.package.kind,
+                    p.package.name.clone(),
+                    p.package.version.clone(),
+                )
+            });
+        if let Some((kind, name, version)) = found {
+            let size = crate::cache::size_or_compute(
+                &mut app.disk_sizes,
+                &mut app.disk_sizes_dirty,
+                kind,
+                &name,
+                &version,
+            );
+            app.size_cache = Some((name, size));
         }
     }
 

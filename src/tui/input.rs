@@ -263,11 +263,10 @@ pub(super) fn handle_normal_mouse(app: &mut App, mouse: MouseEvent) {
                     mouse.row,
                     app.hitboxes.sidebar_rows_top,
                     app.sidebar_state.offset(),
-                ) {
-                    if idx < app.sidebar_categories().len() {
-                        app.sidebar_state.select(Some(idx));
-                        app.reset_list_selection();
-                    }
+                ) && idx < app.sidebar_categories().len()
+                {
+                    app.sidebar_state.select(Some(idx));
+                    app.reset_list_selection();
                 }
             } else if app.hitboxes.list.contains(pos) {
                 app.focus = Focus::List;
@@ -312,10 +311,9 @@ pub(super) fn handle_normal_mouse(app: &mut App, mouse: MouseEvent) {
                 mouse.row,
                 app.hitboxes.list_rows_top,
                 app.list_state.offset(),
-            ) {
-                if let Some(target) = app.selectable_rows().into_iter().find(|&s| s >= idx) {
-                    app.list_state.select(Some(target));
-                }
+            ) && let Some(target) = app.selectable_rows().into_iter().find(|&s| s >= idx)
+            {
+                app.list_state.select(Some(target));
             }
             if app.selected_package().is_some() {
                 app.menu_index = 0;
@@ -331,15 +329,14 @@ pub(super) fn handle_menu_mouse(app: &mut App, mouse: MouseEvent) {
         return;
     }
     let pos = Position::new(mouse.column, mouse.row);
-    if app.hitboxes.menu.contains(pos) {
-        if let Some(idx) = row_to_index(mouse.row, app.hitboxes.menu_rows_top, 0) {
-            if idx < MENU_ITEMS.len() {
-                let (key, _) = MENU_ITEMS[idx];
-                app.mode = InputMode::Normal;
-                trigger_menu_action(app, key);
-                return;
-            }
-        }
+    if app.hitboxes.menu.contains(pos)
+        && let Some(idx) = row_to_index(mouse.row, app.hitboxes.menu_rows_top, 0)
+        && idx < MENU_ITEMS.len()
+    {
+        let (key, _) = MENU_ITEMS[idx];
+        app.mode = InputMode::Normal;
+        trigger_menu_action(app, key);
+        return;
     }
     // Clicked outside the menu (or below its items) - dismiss it, same as Esc.
     app.mode = InputMode::Normal;
@@ -457,14 +454,13 @@ pub(super) fn handle_picker_mouse(app: &mut App, mouse: MouseEvent) {
                     mouse.row,
                     app.hitboxes.picker_rows_top,
                     app.picker_state.offset(),
-                ) {
-                    if idx <= last {
-                        app.picker_state.select(Some(idx));
-                        // A click both selects and activates - mirroring the
-                        // action menu, where a click is a decision, not a
-                        // cursor movement.
-                        handle_picker_key(app, KeyCode::Enter);
-                    }
+                ) && idx <= last
+                {
+                    app.picker_state.select(Some(idx));
+                    // A click both selects and activates - mirroring the
+                    // action menu, where a click is a decision, not a
+                    // cursor movement.
+                    handle_picker_key(app, KeyCode::Enter);
                 }
             } else {
                 // Clicked outside - dismiss, same as Esc.

@@ -454,12 +454,14 @@ mod tests {
         assert!(!truncated);
         let names: Vec<_> = nodes.iter().map(|n| (n.depth, n.name.as_str())).collect();
         assert_eq!(names, vec![(1, "b"), (2, "c"), (1, "missing")]);
-        assert!(nodes
-            .iter()
-            .find(|n| n.name == "missing")
-            .unwrap()
-            .version
-            .is_none());
+        assert!(
+            nodes
+                .iter()
+                .find(|n| n.name == "missing")
+                .unwrap()
+                .version
+                .is_none()
+        );
         assert_eq!(
             nodes
                 .iter()

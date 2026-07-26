@@ -135,11 +135,7 @@ fn icons_enabled() -> bool {
 
 /// Picks between a Nerd Font glyph and a plain-Unicode fallback.
 fn icon(nerd: &'static str, fallback: &'static str) -> &'static str {
-    if icons_enabled() {
-        nerd
-    } else {
-        fallback
-    }
+    if icons_enabled() { nerd } else { fallback }
 }
 
 pub fn brand_icon() -> &'static str {

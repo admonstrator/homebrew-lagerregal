@@ -142,10 +142,10 @@ pub fn store(fingerprint: &str, packages: &[Package], outdated: Option<&BTreeMap
     let Ok(path) = cache_path() else {
         return;
     };
-    if let Some(parent) = path.parent() {
-        if fs::create_dir_all(parent).is_err() {
-            return;
-        }
+    if let Some(parent) = path.parent()
+        && fs::create_dir_all(parent).is_err()
+    {
+        return;
     }
     let mut packages = packages.to_vec();
     for package in &mut packages {

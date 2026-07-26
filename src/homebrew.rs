@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::process::Command;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -387,12 +387,16 @@ mod tests {
         let fixture = include_bytes!("../tests/fixtures/brew_installed.json");
         let packages = parse_brew_json(fixture).expect("fixture should parse");
 
-        assert!(packages
-            .iter()
-            .any(|p| p.name == "nmap" && p.kind == PackageKind::Formula));
-        assert!(packages
-            .iter()
-            .any(|p| p.name == "wireshark" && p.kind == PackageKind::Cask));
+        assert!(
+            packages
+                .iter()
+                .any(|p| p.name == "nmap" && p.kind == PackageKind::Formula)
+        );
+        assert!(
+            packages
+                .iter()
+                .any(|p| p.name == "wireshark" && p.kind == PackageKind::Cask)
+        );
 
         let nmap = packages.iter().find(|p| p.name == "nmap").unwrap();
         assert_eq!(nmap.tap, "homebrew/core");
