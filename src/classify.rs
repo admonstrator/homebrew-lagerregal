@@ -317,9 +317,11 @@ mod tests {
             installed_on_request: true,
             installed_at: None,
             dependencies: Vec::new(),
+            indirect_dependencies: Vec::new(),
             outdated: None,
             unmaintained: false,
             unmaintained_reason: None,
+            pinned: false,
         };
         let dependency = Package {
             name: "libpng".into(),
@@ -331,9 +333,11 @@ mod tests {
             installed_on_request: false,
             installed_at: None,
             dependencies: Vec::new(),
+            indirect_dependencies: Vec::new(),
             outdated: None,
             unmaintained: false,
             unmaintained_reason: None,
+            pinned: false,
         };
         let classified = classify_all(
             vec![on_request, dependency],
@@ -361,9 +365,11 @@ mod tests {
             installed_on_request: true,
             installed_at: None,
             dependencies: Vec::new(),
+            indirect_dependencies: Vec::new(),
             outdated: None,
             unmaintained: false,
             unmaintained_reason: None,
+            pinned: false,
         }];
         let mut overrides = BTreeMap::new();
         overrides.insert("nmap".to_string(), "Security".to_string());
