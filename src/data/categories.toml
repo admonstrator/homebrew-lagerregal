@@ -283,11 +283,16 @@ keywords = ["machine learning", "language model", " llm", "artificial intelligen
 
 [[heuristic]]
 category = "DNS"
-keywords = ["dns", "domain name system", "name server", "nameserver", "whois"]
+keywords = ["dns", "ddns", "subdomain", "domain name system", "name server", "nameserver", "whois"]
 
 [[heuristic]]
 category = "Cryptography"
-keywords = ["cryptograph", "encrypt", " tls", "ssl", "certificate", "pgp", "gpg"]
+keywords = [
+  "cryptograph", "encrypt", " tls", "ssl", "certificate", "pgp", "gpg",
+  # Short keywords above now require a word boundary, so the compounds
+  # they used to catch mid-word need naming explicitly.
+  "openssl", "libressl", "openpgp", "gnupg",
+]
 
 [[heuristic]]
 category = "Cryptocurrency"
@@ -300,6 +305,8 @@ keywords = ["network", "packet", "firewall", "vpn", "proxy", "tunnel", "load bal
 [[heuristic]]
 category = "Media & Graphics"
 keywords = ["video", "audio codec", "audio editor", "image editing", "image manipulat", "screen record", "transcod", "photo editing", "screenshot", "music"]
+# "video" is a strong signal for media tools, but a videogame is a game.
+exclude = ["videogame", "video game"]
 
 [[heuristic]]
 category = "Fonts"
@@ -326,7 +333,7 @@ keywords = ["cloud", "kubernetes", "container", "infrastructure as code", "orche
 
 [[heuristic]]
 category = "Dev Tools & Languages"
-keywords = ["compiler", "programming language", "interpreter", "build system", "version control", "package manager", "linter", "git ", "language server"]
+keywords = ["compiler", "programming language", "interpreter", "build system", "version control", "package manager", "linter", "git", "language server"]
 
 [[heuristic]]
 category = "System Utilities"
@@ -338,7 +345,20 @@ keywords = ["web browser", "chat", "video call", "email client", "messaging app"
 
 [[heuristic]]
 category = "Games & Emulation"
-keywords = ["game", "emulat", "gaming"]
+keywords = ["game", "emulat", "gaming", "videogame", "video game", "wargam"]
+# "emulat" is the useful stem for game emulators, but plenty of software
+# emulates something that has nothing to do with games. These veto it.
+exclude = [
+  "terminal emulat",
+  "terminal-emulat",
+  "dumb-terminal",
+  "terminal emulation",
+  "emulator for google",
+  "emulator for aws",
+  "cloud emulator",
+  "keyboard events",
+  "mouse and keyboard",
+]
 
 [[heuristic]]
 category = "Archives & Compression"
