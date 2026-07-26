@@ -10,9 +10,9 @@ mod tui;
 
 use std::collections::BTreeMap;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
-use comfy_table::{presets::UTF8_FULL, Cell, Table};
+use comfy_table::{Cell, Table, presets::UTF8_FULL};
 use serde::Serialize;
 
 use classify::ClassifiedPackage;
@@ -83,28 +83,28 @@ pub fn load_packages(with_outdated: bool, refresh: bool) -> Result<Vec<homebrew:
 
     if refresh {
         cache::clear();
-    } else if let Some(fp) = &fingerprint {
-        if let Some(cached) = cache::load(fp) {
-            match cached.outdated {
-                Some(outdated) => {
-                    let mut packages = cached.packages;
-                    if with_outdated {
-                        homebrew::apply_outdated(&mut packages, &outdated);
-                    }
-                    return Ok(packages);
-                }
-                // Cached without update info. Still a win: the expensive
-                // half is already in hand, so only `brew outdated` runs.
-                None if with_outdated => {
-                    let mut packages = cached.packages;
-                    let outdated = homebrew::outdated_versions()
-                        .context("failed to check for updates via `brew outdated`")?;
+    } else if let Some(fp) = &fingerprint
+        && let Some(cached) = cache::load(fp)
+    {
+        match cached.outdated {
+            Some(outdated) => {
+                let mut packages = cached.packages;
+                if with_outdated {
                     homebrew::apply_outdated(&mut packages, &outdated);
-                    cache::store(fp, &packages, Some(&outdated));
-                    return Ok(packages);
                 }
-                None => return Ok(cached.packages),
+                return Ok(packages);
             }
+            // Cached without update info. Still a win: the expensive
+            // half is already in hand, so only `brew outdated` runs.
+            None if with_outdated => {
+                let mut packages = cached.packages;
+                let outdated = homebrew::outdated_versions()
+                    .context("failed to check for updates via `brew outdated`")?;
+                homebrew::apply_outdated(&mut packages, &outdated);
+                cache::store(fp, &packages, Some(&outdated));
+                return Ok(packages);
+            }
+            None => return Ok(cached.packages),
         }
     }
 

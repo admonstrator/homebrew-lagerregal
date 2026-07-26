@@ -13,14 +13,14 @@ use anyhow::Result;
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
+use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::Alignment;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
-use ratatui::Terminal;
 
 use crate::classify;
 use crate::homebrew::{self, PackageKind};

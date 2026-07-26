@@ -342,10 +342,10 @@ impl App {
     /// would silently fall back to "All".
     pub(super) fn clamp_sidebar_selection(&mut self) {
         let len = self.sidebar_categories().len();
-        if let Some(i) = self.sidebar_state.selected() {
-            if i >= len {
-                self.sidebar_state.select(Some(len.saturating_sub(1)));
-            }
+        if let Some(i) = self.sidebar_state.selected()
+            && i >= len
+        {
+            self.sidebar_state.select(Some(len.saturating_sub(1)));
         }
     }
 
@@ -421,14 +421,14 @@ impl App {
                 result.sort_by_key(|p| std::cmp::Reverse(p.package.installed_at));
             }
             SortMode::Size => {
-                if let Some((sig, sizes)) = &self.size_sort_cache {
-                    if *sig == self.scope_signature() {
-                        result.sort_by(|a, b| {
-                            let sa = sizes.get(&a.package.name).copied().unwrap_or(0);
-                            let sb = sizes.get(&b.package.name).copied().unwrap_or(0);
-                            sb.cmp(&sa)
-                        });
-                    }
+                if let Some((sig, sizes)) = &self.size_sort_cache
+                    && *sig == self.scope_signature()
+                {
+                    result.sort_by(|a, b| {
+                        let sa = sizes.get(&a.package.name).copied().unwrap_or(0);
+                        let sb = sizes.get(&b.package.name).copied().unwrap_or(0);
+                        sb.cmp(&sa)
+                    });
                 }
             }
         }
