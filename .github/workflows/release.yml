@@ -31,7 +31,7 @@ jobs:
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Derive version from tag
         id: version
@@ -65,7 +65,7 @@ jobs:
           archive="lagerregal-${version}-${{ matrix.target }}.tar.gz"
           tar -czf "$archive" -C "target/${{ matrix.target }}/release" lagerregal
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: lagerregal-${{ matrix.target }}
           path: lagerregal-*.tar.gz
@@ -81,13 +81,13 @@ jobs:
       # separate repo, so that step uses the GH_TAP_PAT secret instead.
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Derive version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
