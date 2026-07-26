@@ -5,7 +5,6 @@ use std::process::Command;
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::classify::ClassifiedPackage;
 use crate::homebrew::{Package, PackageKind};
 
 /// Runs `brew --cellar` / `brew --caskroom` once per process and caches the
@@ -113,18 +112,6 @@ pub fn format_size(bytes: u64) -> String {
     }
 }
 
-/// Sums on-disk size per category for a (already scoped/filtered) list of
-/// packages. Walks the filesystem for every package, so it's meant for an
-/// explicit, opt-in report rather than something computed on every listing.
-pub fn total_size_by_category(classified: &[ClassifiedPackage]) -> BTreeMap<String, u64> {
-    let mut totals: BTreeMap<String, u64> = BTreeMap::new();
-    for p in classified {
-        let size = package_size(p.package.kind, &p.package.name, &p.package.version).unwrap_or(0);
-        *totals.entry(p.category.clone()).or_insert(0) += size;
-    }
-    totals
-}
-
 /// Converts a Unix timestamp (seconds, UTC) to a proleptic-Gregorian civil
 /// date. Pure integer math (Howard Hinnant's `civil_from_days` algorithm),
 /// used instead of pulling in a date/time crate for a single "installed on"
@@ -174,6 +161,63 @@ pub struct DepNode {
     pub depth: usize,
     pub name: String,
     pub version: Option<String>,
+}
+
+/// Installed packages that list `name` among their direct (declared)
+/// dependencies - the reverse edge of `dependency_tree`, answering "why is
+/// this here?" for anything that arrived only as a dependency. Casks count
+/// as dependents too, since they can declare formula dependencies.
+pub fn reverse_dependencies<'a>(
+    packages: impl IntoIterator<Item = &'a Package>,
+    name: &str,
+) -> Vec<String> {
+    let mut out: Vec<String> = packages
+        .into_iter()
+        .filter(|p| p.dependencies.iter().any(|d| d == name))
+        .map(|p| p.name.clone())
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Names of installed packages that `brew autoremove` would consider
+/// removable: installed only as a dependency, and needed by no package that
+/// remains. Runs to a fixpoint because removals cascade - dropping the last
+/// dependent of `a` can orphan `a`'s own dependency `b` in the next round.
+///
+/// Uses the *full* runtime-dependency edge set (direct + indirect), unlike
+/// the dependency tree, which walks direct declarations only. The indirect
+/// edges matter here: after the formula that directly declared a library is
+/// uninstalled, the remaining dependents often reference it only through
+/// their receipts' transitive entries - counting just direct edges would
+/// flag such a library as an orphan while `brew autoremove` keeps it.
+pub fn autoremove_candidates<'a>(
+    packages: impl IntoIterator<Item = &'a Package>,
+) -> HashSet<String> {
+    let packages: Vec<&Package> = packages.into_iter().collect();
+    let mut removed: HashSet<String> = HashSet::new();
+    loop {
+        let mut changed = false;
+        for p in &packages {
+            if p.installed_on_request || removed.contains(&p.name) {
+                continue;
+            }
+            let still_needed = packages.iter().any(|q| {
+                q.name != p.name
+                    && !removed.contains(&q.name)
+                    && (q.dependencies.iter().any(|d| d == &p.name)
+                        || q.indirect_dependencies.iter().any(|d| d == &p.name))
+            });
+            if !still_needed {
+                removed.insert(p.name.clone());
+                changed = true;
+            }
+        }
+        if !changed {
+            return removed;
+        }
+    }
 }
 
 /// Builds a flattened dependency tree for `root`, walking each package's
@@ -321,10 +365,79 @@ mod tests {
             installed_on_request: true,
             installed_at: None,
             dependencies: deps.iter().map(|s| s.to_string()).collect(),
+            indirect_dependencies: Vec::new(),
             outdated: None,
             unmaintained: false,
             unmaintained_reason: None,
+            pinned: false,
         }
+    }
+
+    #[test]
+    fn autoremove_candidates_cascades_through_orphan_chains() {
+        let dep = |name: &str, deps: &[&str]| {
+            let mut p = pkg(name, "1.0", deps);
+            p.installed_on_request = false;
+            p
+        };
+        // x (on request) -> a -> b : the whole chain is anchored by x.
+        // c -> d, with no dependents: c falls, which then cascades to d.
+        let packages = vec![
+            pkg("x", "1.0", &["a"]),
+            dep("a", &["b"]),
+            dep("b", &[]),
+            dep("c", &["d"]),
+            dep("d", &[]),
+        ];
+        let orphans = autoremove_candidates(&packages);
+        assert!(
+            !orphans.contains("a") && !orphans.contains("b"),
+            "anchored chain survives"
+        );
+        assert!(
+            orphans.contains("c") && orphans.contains("d"),
+            "unanchored chain cascades"
+        );
+        assert!(!orphans.contains("x"), "on-request packages never qualify");
+    }
+
+    #[test]
+    fn autoremove_candidates_honours_indirect_dependency_edges() {
+        // Regression for a real-world case: `gpgmepp` referenced `unbound`
+        // only via its receipt's transitive runtime deps (the formula that
+        // declared it directly was gone), and an analysis over direct edges
+        // alone called `unbound` an orphan while `brew autoremove` did not.
+        let mut root = pkg("root", "1.0", &[]);
+        root.indirect_dependencies = vec!["lib".to_string()];
+        let mut lib = pkg("lib", "1.0", &[]);
+        lib.installed_on_request = false;
+
+        let orphans = autoremove_candidates([&root, &lib]);
+        assert!(
+            !orphans.contains("lib"),
+            "an indirect edge anchors the package"
+        );
+    }
+
+    #[test]
+    fn reverse_dependencies_lists_direct_dependents_sorted() {
+        let a = pkg("a", "1.0", &["shared", "b"]);
+        let b = pkg("b", "2.0", &["shared"]);
+        let c = pkg("c", "3.0", &[]);
+        let shared = pkg("shared", "0.1", &[]);
+
+        let all = [&a, &b, &c, &shared];
+        assert_eq!(
+            reverse_dependencies(all.into_iter(), "shared"),
+            vec!["a".to_string(), "b".to_string()]
+        );
+        assert!(reverse_dependencies(all.into_iter(), "c").is_empty());
+        // Only *direct* dependents: `c` doesn't appear just because some
+        // chain could reach it.
+        assert_eq!(
+            reverse_dependencies(all.into_iter(), "b"),
+            vec!["a".to_string()]
+        );
     }
 
     #[test]
