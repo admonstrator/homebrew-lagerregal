@@ -91,6 +91,12 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// List dependency-only packages nothing depends on anymore (what `brew autoremove` would remove)
+    Orphans {
+        /// Output as JSON instead of a table
+        #[arg(long)]
+        json: bool,
+    },
     /// Upgrade a single installed package via `brew upgrade`
     Update {
         /// Homebrew formula or cask name

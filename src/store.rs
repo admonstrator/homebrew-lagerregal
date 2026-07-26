@@ -62,6 +62,11 @@ impl State {
     pub fn set_note(&mut self, name: &str, note: &str) {
         self.notes.insert(name.to_string(), note.to_string());
     }
+
+    /// Removes a note. Returns `false` if there was none to remove.
+    pub fn remove_note(&mut self, name: &str) -> bool {
+        self.notes.remove(name).is_some()
+    }
 }
 
 /// The app's local data directory, e.g. `~/Library/Application Support/lagerregal`
@@ -102,6 +107,16 @@ mod tests {
         assert!(state.remove_category("nmap"));
         assert!(!state.categories.contains_key("nmap"));
         assert!(!state.remove_category("nmap"));
+    }
+
+    #[test]
+    fn remove_note_clears_and_reports_whether_one_existed() {
+        let mut state = State::default();
+        state.set_note("nmap", "recon box");
+
+        assert!(state.remove_note("nmap"));
+        assert!(!state.notes.contains_key("nmap"));
+        assert!(!state.remove_note("nmap"));
     }
 
     #[test]

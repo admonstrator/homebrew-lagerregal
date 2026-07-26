@@ -49,6 +49,7 @@ fn main() -> Result<()> {
         Some(Command::Categories { all, sizes }) => cmd_categories(all, sizes),
         Some(Command::Outdated { all, json }) => cmd_outdated(all, json),
         Some(Command::Unmaintained { all, json }) => cmd_unmaintained(all, json),
+        Some(Command::Orphans { json }) => cmd_orphans(json),
         Some(Command::Update { name }) => cmd_update(&name),
         Some(Command::Snapshot { action }) => match action {
             SnapshotCommand::Save { name, all } => {
@@ -303,10 +304,21 @@ fn cmd_show(name: &str) -> Result<()> {
                 .unwrap_or("unspecified reason")
         );
     }
-    if let Some(size) =
-        details::package_size(pkg.package.kind, &pkg.package.name, &pkg.package.version)
     {
-        println!("  Size:        {}", details::format_size(size));
+        let mut size_map = cache::load_sizes();
+        let mut dirty = false;
+        if let Some(size) = cache::size_or_compute(
+            &mut size_map,
+            &mut dirty,
+            pkg.package.kind,
+            &pkg.package.name,
+            &pkg.package.version,
+        ) {
+            println!("  Size:        {}", details::format_size(size));
+        }
+        if dirty {
+            cache::merge_sizes(&size_map);
+        }
     }
     if let Some(installed_at) = pkg.package.installed_at {
         println!("  Installed:   {}", details::format_age(installed_at));
@@ -335,11 +347,30 @@ fn cmd_show(name: &str) -> Result<()> {
         }
     }
 
+    let required_by =
+        details::reverse_dependencies(classified.iter().map(|p| &p.package), &pkg.package.name);
+    if !required_by.is_empty() {
+        println!("\n  Required by:");
+        for name in &required_by {
+            println!("    - {name}");
+        }
+    }
+
     Ok(())
 }
 
 fn cmd_note(name: &str, text: &str) -> Result<()> {
     let mut state = State::load()?;
+    // An empty text clears the note instead of storing an empty string.
+    if text.trim().is_empty() {
+        if state.remove_note(name) {
+            state.save()?;
+            println!("Cleared the note for \"{name}\".");
+        } else {
+            println!("\"{name}\" has no note to clear.");
+        }
+        return Ok(());
+    }
     state.set_note(name, text);
     state.save()?;
     println!("Saved note for \"{name}\".");
@@ -373,7 +404,28 @@ fn cmd_categories(all: bool, sizes: bool) -> Result<()> {
     for pkg in &classified {
         *counts.entry(pkg.category.clone()).or_insert(0) += 1;
     }
-    let size_totals = sizes.then(|| details::total_size_by_category(&classified));
+    // Seeded from the persistent size cache, so repeat runs only walk
+    // packages whose installed version changed since last time.
+    let size_totals = sizes.then(|| {
+        let mut size_map = cache::load_sizes();
+        let mut dirty = false;
+        let mut totals: BTreeMap<String, u64> = BTreeMap::new();
+        for p in &classified {
+            let size = cache::size_or_compute(
+                &mut size_map,
+                &mut dirty,
+                p.package.kind,
+                &p.package.name,
+                &p.package.version,
+            )
+            .unwrap_or(0);
+            *totals.entry(p.category.clone()).or_insert(0) += size;
+        }
+        if dirty {
+            cache::merge_sizes(&size_map);
+        }
+        totals
+    });
 
     let mut table = Table::new();
     table.load_preset(UTF8_FULL);
@@ -466,6 +518,48 @@ fn cmd_unmaintained(all: bool, json: bool) -> Result<()> {
     println!("{table}");
     println!(
         "\n{} package(s) are no longer maintained upstream in Homebrew. Consider a replacement or removing them.",
+        classified.len()
+    );
+
+    Ok(())
+}
+
+/// Dependency-only packages that nothing installed still depends on - what
+/// `brew autoremove` would remove. No `--all` flag: orphans are by
+/// definition dependency-only, so the on-request scoping never applies.
+fn cmd_orphans(json: bool) -> Result<()> {
+    let classified = load_classified(false)?;
+    let orphans = details::autoremove_candidates(classified.iter().map(|p| &p.package));
+    let mut classified: Vec<_> = classified
+        .into_iter()
+        .filter(|p| orphans.contains(&p.package.name))
+        .collect();
+    classified.sort_by(|a, b| a.package.name.cmp(&b.package.name));
+
+    if json {
+        let views: Vec<PackageJson> = classified.iter().map(PackageJson::from).collect();
+        println!("{}", serde_json::to_string_pretty(&views)?);
+        return Ok(());
+    }
+
+    if classified.is_empty() {
+        println!("No orphaned packages - everything installed as a dependency is still needed.");
+        return Ok(());
+    }
+
+    let mut table = Table::new();
+    table.load_preset(UTF8_FULL);
+    table.set_header(vec!["Name", "Version", "Description"]);
+    for p in &classified {
+        table.add_row(vec![
+            Cell::new(&p.package.name),
+            Cell::new(&p.package.version),
+            Cell::new(&p.package.desc),
+        ]);
+    }
+    println!("{table}");
+    println!(
+        "\n{} orphaned package(s). `brew autoremove` removes them all at once.",
         classified.len()
     );
 
