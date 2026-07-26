@@ -66,6 +66,13 @@ pub const HIGHLIGHT_BG: Color = SURFACE;
 /// Background tint for the slim header/footer bars.
 pub const HEADER_BG: Color = MANTLE;
 
+/// Background for every other row in the package list. Deliberately a very
+/// small step away from the terminal's own background - enough to guide the
+/// eye along a wide row, not enough to read as "these rows are special".
+/// Selection uses `HIGHLIGHT_BG`, which is lighter, so the two never
+/// compete: stripes recede, the selected row comes forward.
+pub const ROW_ALT_BG: Color = MANTLE;
+
 pub fn source_color(source: ClassificationSource) -> Color {
     match source {
         ClassificationSource::Manual => MANUAL,

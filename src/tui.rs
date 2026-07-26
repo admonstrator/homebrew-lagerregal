@@ -207,9 +207,11 @@ impl App {
     /// names the user has manually assigned that aren't part of the
     /// built-in taxonomy (appended alphabetically at the end).
     fn sidebar_categories(&self) -> Vec<String> {
+        let scoped = self.scoped_packages();
+        let counts = category_counts(scoped.iter().copied());
+
         let known = classify::known_categories();
-        let mut extra: Vec<String> = self
-            .scoped_packages()
+        let mut extra: Vec<String> = scoped
             .iter()
             .map(|p| p.category.clone())
             .filter(|c| !known.contains(c) && c != OUTDATED_CATEGORY && c != UNMAINTAINED_CATEGORY)
@@ -217,14 +219,35 @@ impl App {
         extra.sort();
         extra.dedup();
 
+        // The three pseudo-categories are always listed, even at zero: they
+        // answer a question ("is anything outdated?") where the answer "no"
+        // is worth showing. Real categories with nothing in them are just
+        // rows to scroll past, so they're hidden until they have contents.
         let mut cats = vec![
             ALL_CATEGORY.to_string(),
             OUTDATED_CATEGORY.to_string(),
             UNMAINTAINED_CATEGORY.to_string(),
         ];
-        cats.extend(known);
-        cats.extend(extra);
+        cats.extend(
+            known
+                .into_iter()
+                .chain(extra)
+                .filter(|c| counts.get(c).copied().unwrap_or(0) > 0),
+        );
         cats
+    }
+
+    /// Keeps the sidebar selection in range. The category list can shrink
+    /// underneath it - toggling dependency-only packages changes which
+    /// categories are non-empty - and an index left pointing past the end
+    /// would silently fall back to "All".
+    fn clamp_sidebar_selection(&mut self) {
+        let len = self.sidebar_categories().len();
+        if let Some(i) = self.sidebar_state.selected() {
+            if i >= len {
+                self.sidebar_state.select(Some(len.saturating_sub(1)));
+            }
+        }
     }
 
     fn selected_category(&self) -> String {
@@ -443,10 +466,12 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, mut app: App) -> R
                         InputMode::Menu => handle_menu_key(&mut app, key.code),
                         InputMode::Confirm => handle_confirm_key(&mut app, key.code),
                     }
+                    app.clamp_sidebar_selection();
                     app.clamp_list_selection();
                 }
                 Event::Mouse(mouse) => {
                     handle_mouse(&mut app, mouse);
+                    app.clamp_sidebar_selection();
                     app.clamp_list_selection();
                 }
                 _ => {}
@@ -1088,7 +1113,7 @@ fn draw(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(1),
             Constraint::Min(5),
-            Constraint::Length(14),
+            Constraint::Length(8),
             Constraint::Length(3),
         ])
         .split(area);
@@ -1321,27 +1346,36 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     // be noise - only show the column when it's actually adding information.
     let show_category = app.selected_category() == ALL_CATEGORY;
 
+    // The multi-select gutter only exists once something is actually
+    // selected - otherwise every row would carry two columns of indentation
+    // for a mode most sessions never enter.
+    let selecting = !app.selected_names.is_empty();
+
     let rows: Vec<Row> = app
         .visible_packages()
         .iter()
-        .map(|p| {
+        .enumerate()
+        .map(|(i, p)| {
             let mut name_spans = Vec::new();
-            if app.selected_names.contains(&p.package.name) {
-                name_spans.push(Span::styled(
-                    format!("{} ", theme::checked_icon()),
-                    Style::default()
-                        .fg(theme::ACCENT)
-                        .add_modifier(Modifier::BOLD),
-                ));
-            } else {
-                name_spans.push(Span::raw("  "));
+            if selecting {
+                if app.selected_names.contains(&p.package.name) {
+                    name_spans.push(Span::styled(
+                        format!("{} ", theme::checked_icon()),
+                        Style::default()
+                            .fg(theme::ACCENT)
+                            .add_modifier(Modifier::BOLD),
+                    ));
+                } else {
+                    name_spans.push(Span::raw("  "));
+                }
             }
-            // Formula vs cask, colored by where the category came from - two
-            // independent facts folded into one glyph so the name column
-            // doesn't grow a marker per attribute.
+            // Glyph alone says formula vs cask. It used to be tinted by
+            // classification source too, which meant one character carrying
+            // two unrelated meanings and reading as neither; the source is
+            // spelled out in the detail pane instead.
             name_spans.push(Span::styled(
                 format!("{} ", theme::kind_icon(p.package.kind)),
-                Style::default().fg(theme::source_color(p.source)),
+                Style::default().fg(theme::ACCENT_DIM),
             ));
             name_spans.push(Span::raw(p.package.name.clone()));
             if p.source == ClassificationSource::Manual {
@@ -1368,22 +1402,31 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
             }
             let mut cells = vec![Cell::new(Line::from(name_spans))];
             if show_category {
+                // Only the glyph carries the category's color now - enough
+                // to tie a row to its sidebar entry, without painting a
+                // whole column in nineteen competing hues.
                 cells.push(Cell::new(Line::from(vec![
                     Span::styled(
                         format!("{} ", theme::category_icon(&p.category)),
                         Style::default().fg(theme::category_color(&p.category)),
                     ),
-                    Span::styled(
-                        p.category.clone(),
-                        Style::default().fg(theme::category_color(&p.category)),
-                    ),
+                    Span::styled(p.category.clone(), Style::default().fg(theme::LABEL)),
                 ])));
             }
             cells.push(
                 Cell::new(p.package.version.clone()).style(Style::default().fg(theme::LABEL)),
             );
             cells.push(Cell::new(p.package.desc.clone()));
-            Row::new(cells)
+
+            // Zebra striping: a background step small enough to read as
+            // texture rather than state. The selected row's highlight is
+            // painted after this and wins, so the two never fight.
+            let row = Row::new(cells);
+            if i % 2 == 1 {
+                row.style(Style::default().bg(theme::ROW_ALT_BG))
+            } else {
+                row
+            }
         })
         .collect();
 
@@ -1535,79 +1578,100 @@ fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     };
 
-    // One helper for every "icon  label  value" row, so the detail pane's
-    // columns line up without repeating the same span dance per field.
-    let field = |icon: &str, label: &str, value: String, value_style: Style| {
-        Line::from(vec![
+    // The detail pane is a fixed six usable lines, so fields are packed
+    // several to a row and identified by their glyph rather than a written
+    // label - the icon already says "size" or "installed", and the labels
+    // cost ten columns each to repeat it.
+    let dot = || Span::styled("  \u{b7}  ", Style::default().fg(theme::ACCENT_DIM));
+    let tagged = |icon: &str, value: String, style: Style| {
+        vec![
             Span::styled(format!("{icon} "), Style::default().fg(theme::LABEL)),
-            Span::styled(format!("{label:<10}"), Style::default().fg(theme::LABEL)),
-            Span::styled(value, value_style),
-        ])
+            Span::styled(value, style),
+        ]
     };
 
-    let mut version_spans = vec![
+    // 1: name + kind
+    let mut info_lines = vec![Line::from(vec![
         Span::styled(
-            format!("{} ", theme::version_icon()),
-            Style::default().fg(theme::LABEL),
+            format!("{} ", theme::kind_icon(p.package.kind)),
+            Style::default().fg(theme::ACCENT_DIM),
         ),
         Span::styled(
-            format!("{:<10}", "Version"),
-            Style::default().fg(theme::LABEL),
+            p.package.name.clone(),
+            Style::default()
+                .fg(theme::ACCENT)
+                .add_modifier(Modifier::BOLD),
         ),
-        Span::raw(p.package.version.clone()),
+        Span::styled(
+            format!("  {}", p.package.kind.as_str()),
+            Style::default().fg(theme::ACCENT_DIM),
+        ),
+    ])];
+
+    // 2: category (+ where it came from) and publisher
+    let mut line = vec![
+        Span::styled(
+            format!("{} ", theme::category_icon(&p.category)),
+            Style::default().fg(theme::category_color(&p.category)),
+        ),
+        Span::styled(
+            p.category.clone(),
+            Style::default().fg(theme::category_color(&p.category)),
+        ),
+        Span::styled(
+            format!(" [{}]", p.source.as_str()),
+            Style::default().fg(theme::source_color(p.source)),
+        ),
     ];
+    line.push(dot());
+    line.extend(tagged(
+        theme::publisher_icon(),
+        p.package.tap.clone(),
+        Style::default().fg(theme::LABEL),
+    ));
+    info_lines.push(Line::from(line));
+
+    // 3: version, size, install date - the numbers, on one line
+    let mut line = tagged(
+        theme::version_icon(),
+        p.package.version.clone(),
+        Style::default(),
+    );
     if let Some(newer) = &p.package.outdated {
-        version_spans.push(Span::styled(
-            format!("  {} {newer} available", theme::outdated_icon()),
+        line.push(Span::styled(
+            format!("  {} {newer}", theme::outdated_icon()),
             Style::default()
                 .fg(theme::OUTDATED)
                 .add_modifier(Modifier::BOLD),
         ));
     }
+    if let Some((_, Some(size))) = &app.size_cache {
+        line.push(dot());
+        line.extend(tagged(
+            theme::size_icon(),
+            details::format_size(*size),
+            Style::default().fg(theme::size_color(*size)),
+        ));
+    }
+    if let Some(installed_at) = p.package.installed_at {
+        line.push(dot());
+        line.extend(tagged(
+            theme::time_icon(),
+            details::format_age(installed_at),
+            Style::default().fg(theme::LABEL),
+        ));
+    }
+    info_lines.push(Line::from(line));
 
-    let mut info_lines = vec![
-        Line::from(vec![
-            Span::styled(
-                format!("{} ", theme::kind_icon(p.package.kind)),
-                Style::default().fg(theme::source_color(p.source)),
-            ),
-            Span::styled(
-                p.package.name.clone(),
-                Style::default()
-                    .fg(theme::ACCENT)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!("  {}", p.package.kind.as_str()),
-                Style::default().fg(theme::ACCENT_DIM),
-            ),
-        ]),
-        Line::from(version_spans),
-        Line::from(vec![
-            Span::styled(
-                format!("{} ", theme::category_icon(&p.category)),
-                Style::default().fg(theme::category_color(&p.category)),
-            ),
-            Span::styled(
-                format!("{:<10}", "Category"),
-                Style::default().fg(theme::LABEL),
-            ),
-            Span::styled(
-                p.category.clone(),
-                Style::default().fg(theme::category_color(&p.category)),
-            ),
-            Span::styled(
-                format!("  [{}]", p.source.as_str()),
-                Style::default().fg(theme::source_color(p.source)),
-            ),
-        ]),
-        field(
-            theme::publisher_icon(),
-            "Publisher",
-            p.package.tap.clone(),
-            Style::default(),
-        ),
-    ];
+    // 4: homepage
+    info_lines.push(Line::from(tagged(
+        theme::link_icon(),
+        p.package.homepage.clone(),
+        Style::default().fg(theme::HEURISTIC),
+    )));
+
+    // 5: the deprecation warning if there is one, else the description -
+    // a package Homebrew has given up on is the more urgent of the two.
     if p.package.unmaintained {
         info_lines.push(Line::from(Span::styled(
             format!(
@@ -1623,35 +1687,13 @@ fn draw_detail(f: &mut Frame, app: &mut App, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         )));
     }
-    if let Some((_, Some(size))) = &app.size_cache {
-        info_lines.push(field(
-            theme::size_icon(),
-            "Size",
-            details::format_size(*size),
-            Style::default().fg(theme::size_color(*size)),
-        ));
-    }
-    if let Some(installed_at) = p.package.installed_at {
-        info_lines.push(field(
-            theme::time_icon(),
-            "Installed",
-            details::format_age(installed_at),
-            Style::default(),
-        ));
-    }
-    info_lines.push(field(
-        theme::link_icon(),
-        "Homepage",
-        p.package.homepage.clone(),
-        Style::default().fg(theme::HEURISTIC),
-    ));
-    info_lines.push(Line::from(""));
     info_lines.push(Line::from(Span::styled(
         p.package.desc.clone(),
         Style::default().fg(theme::LABEL),
     )));
+
+    // 6: the note, if one was written
     if let Some(note) = &p.note {
-        info_lines.push(Line::from(""));
         info_lines.push(Line::from(vec![
             Span::styled(
                 format!("{} ", theme::note_icon()),
