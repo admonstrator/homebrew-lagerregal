@@ -96,6 +96,60 @@ pub fn package_size(kind: PackageKind, name: &str, version: &str) -> Option<u64>
     Some(dir_size(&dir))
 }
 
+/// Where a formula's executables live. Running one from here rather than
+/// off `PATH` launches exactly the package on screen, not whatever else
+/// happens to shadow that name.
+pub fn formula_bin_dir(name: &str, version: &str) -> Option<PathBuf> {
+    Some(cellar_root()?.join(name).join(version).join("bin"))
+}
+
+/// The executables a formula installed, read from `<Cellar>/<name>/<version>/bin`.
+/// Sorted, so the result doesn't depend on directory order.
+pub fn formula_binaries(name: &str, version: &str) -> Vec<String> {
+    let Some(dir) = formula_bin_dir(name, version) else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
+        .flatten()
+        .filter_map(|e| e.file_name().into_string().ok())
+        .collect();
+    names.sort();
+    names
+}
+
+/// Picks which of a formula's binaries "launching" it should run. The
+/// formula name is only a hint - `helix` ships `hx`, `libgit2` ships
+/// `git2` - so an exact match wins, otherwise a lone binary is
+/// unambiguous. Anything else (`binutils` installs 40) has no defensible
+/// answer and is left to the caller to report.
+pub fn pick_binary<'a>(name: &str, binaries: &'a [String]) -> Option<&'a str> {
+    if let Some(exact) = binaries.iter().find(|b| *b == name) {
+        return Some(exact);
+    }
+    match binaries {
+        [only] => Some(only),
+        _ => None,
+    }
+}
+
+/// Locates a cask's launchable `.app` bundle, if it has one. Not every cask
+/// installs a GUI app (CLI-only casks, fonts, plugins, ...), so `None` here
+/// just means "nothing to open", not an error. The Caskroom entry is
+/// typically a symlink to the real bundle under `/Applications` (see
+/// `dir_size`'s comment) - `open` follows that symlink fine, so the path
+/// doesn't need resolving further.
+pub fn cask_app_path(name: &str, version: &str) -> Option<PathBuf> {
+    let dir = caskroom_root()?.join(name).join(version);
+    std::fs::read_dir(&dir)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "app"))
+}
+
 /// Formats a byte count as a human-readable size (e.g. "34.2 MB").
 pub fn format_size(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
@@ -308,6 +362,22 @@ fn walk(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pick_binary_prefers_an_exact_name_then_falls_back_to_a_lone_binary() {
+        let s = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+
+        // Exact match wins even when other binaries are alongside it.
+        assert_eq!(
+            pick_binary("curl", &s(&["curl", "curl-config"])),
+            Some("curl")
+        );
+        // The name is only a hint: helix ships `hx`, and it's unambiguous.
+        assert_eq!(pick_binary("helix", &s(&["hx"])), Some("hx"));
+        // Several binaries, none named after the formula - no defensible pick.
+        assert_eq!(pick_binary("binutils", &s(&["ar", "ld", "nm"])), None);
+        assert_eq!(pick_binary("gmp", &[]), None);
+    }
 
     #[test]
     fn unix_to_ymd_matches_known_dates() {

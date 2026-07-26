@@ -201,11 +201,17 @@ pub(super) struct App {
     /// draw (so the confirm dialog has already visibly closed) and suspends
     /// the TUI to run `brew` with real terminal output.
     pub(super) pending_brew: Option<(BrewAction, Vec<(PackageKind, String)>)>,
+    /// Absolute path to a formula binary Enter/double-click just launched.
+    /// Casks launch inline (`open` returns immediately and needs no real
+    /// terminal), but running a CLI tool interactively does need the real
+    /// terminal back, so - like `pending_brew` - this is picked up by
+    /// `run_app` after the next draw and suspends the TUI to run it.
+    pub(super) pending_launch: Option<String>,
     /// Hit regions from the last frame, for mouse click/scroll dispatch.
     pub(super) hitboxes: Hitboxes,
     /// (time, package row index) of the last left-click on the package
     /// list, so a second click on the same row shortly after reads as a
-    /// double-click (open the action menu) instead of two plain selects.
+    /// double-click (launch the package) instead of two plain selects.
     pub(super) last_list_click: Option<(Instant, usize)>,
 }
 
@@ -245,6 +251,7 @@ impl App {
             confirm_action: BrewAction::Upgrade,
             confirm_targets: Vec::new(),
             pending_brew: None,
+            pending_launch: None,
             hitboxes: Hitboxes::default(),
             last_list_click: None,
         }

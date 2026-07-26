@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 use std::io::{self, BufRead, Stdout};
+use std::process::Command;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -165,6 +166,14 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, mut app: App) -> R
             continue;
         }
 
+        // Same two-phase seam as `pending_brew`: a formula's CLI needs the
+        // real terminal, so this only fires after the draw that shows
+        // selection/status has already happened.
+        if let Some(name) = app.pending_launch.take() {
+            run_launch(terminal, &name)?;
+            continue;
+        }
+
         if event::poll(Duration::from_millis(250))? {
             match event::read()? {
                 Event::Key(key) => {
@@ -275,6 +284,40 @@ fn run_brew_actions(
         }
         println!();
     }
+    println!("Press Enter to return to lagerregal...");
+    let mut discard = String::new();
+    let _ = io::stdin().lock().read_line(&mut discard);
+
+    enable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        EnterAlternateScreen,
+        EnableMouseCapture
+    )?;
+    terminal.clear()?;
+    Ok(())
+}
+
+/// Runs a formula's binary (already resolved against its Cellar `bin`) with
+/// the real terminal handed back - the same seam as `run_brew_actions`
+/// above, since an interactive CLI tool needs raw stdio, not a ratatui pane.
+fn run_launch(terminal: &mut Terminal<CrosstermBackend<Stdout>>, binary: &str) -> Result<()> {
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    println!();
+    println!("==> {binary}");
+    match Command::new(binary).status() {
+        Ok(status) if status.success() => {}
+        Ok(status) => println!("(\"{binary}\" exited with {status})"),
+        Err(e) => println!("(failed to launch \"{binary}\": {e})"),
+    }
+    println!();
     println!("Press Enter to return to lagerregal...");
     let mut discard = String::new();
     let _ = io::stdin().lock().read_line(&mut discard);

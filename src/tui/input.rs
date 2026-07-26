@@ -10,12 +10,13 @@ use crossterm::event::{KeyCode, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Position;
 
 use crate::classify::{self, ClassificationSource};
+use crate::details;
 use crate::homebrew::{self, PackageKind};
 use crate::store::State;
 
 use super::app::*;
 
-/// Actions in the Enter-triggered action menu. All but the last are also
+/// Actions in the `m`-triggered action menu. All but the last are also
 /// bound to the same letter in Normal mode; uninstall is menu-only on
 /// purpose, so removal is never a single stray keypress away.
 pub(super) const MENU_ITEMS: &[(char, &str)] = &[
@@ -55,12 +56,8 @@ pub(super) fn handle_normal_key(app: &mut App, code: KeyCode) {
             app.mode = InputMode::Filter;
         }
         KeyCode::Char('?') => app.mode = InputMode::Help,
-        KeyCode::Enter => {
-            if app.selected_package().is_some() {
-                app.menu_index = 0;
-                app.mode = InputMode::Menu;
-            }
-        }
+        KeyCode::Enter => launch_selected(app),
+        KeyCode::Char('m') => open_menu(app),
         KeyCode::Char('n') => start_note_edit(app),
         KeyCode::Char('c') => start_category_edit(app),
         KeyCode::Char('R') => reset_category(app),
@@ -154,8 +151,9 @@ fn sync_live_filter(app: &mut App) {
     }
 }
 
-/// Handles a keypress while the Enter-triggered action menu is open: up/down
-/// (or j/k) move the highlight, Enter activates the highlighted action.
+/// Handles a keypress while the action menu (`m` / right-click) is open:
+/// up/down (or j/k) move the highlight, Enter activates the highlighted
+/// action.
 /// To keep the menu fast for anyone who already knows the shortcuts,
 /// pressing a menu item's own letter activates it immediately too.
 pub(super) fn handle_menu_key(app: &mut App, code: KeyCode) {
@@ -285,17 +283,14 @@ pub(super) fn handle_normal_mouse(app: &mut App, mouse: MouseEvent) {
                         let now = Instant::now();
                         // Only a direct hit on the package row counts
                         // towards a double-click - a heading resolving to
-                        // the same row shouldn't open that package's menu.
+                        // the same row shouldn't launch that package.
                         let is_double_click = target == idx
                             && app.last_list_click.is_some_and(|(t, i)| {
                                 i == idx && now.duration_since(t) < Duration::from_millis(400)
                             });
                         if is_double_click {
                             app.last_list_click = None;
-                            if app.selected_package().is_some() {
-                                app.menu_index = 0;
-                                app.mode = InputMode::Menu;
-                            }
+                            launch_selected(app);
                         } else {
                             app.last_list_click = Some((now, target));
                         }
@@ -656,6 +651,60 @@ pub(super) fn toggle_pin(app: &mut App) {
             };
         }
         Err(e) => app.status = format!("{e}"),
+    }
+}
+
+/// Opens the action menu for the highlighted package - the slow path now
+/// that Enter/double-click launch directly, reachable via `m` or a
+/// right-click.
+pub(super) fn open_menu(app: &mut App) {
+    if app.selected_package().is_some() {
+        app.menu_index = 0;
+        app.mode = InputMode::Menu;
+    }
+}
+
+/// Enter (and a list double-click) launch the highlighted package directly
+/// rather than opening the action menu: a cask opens its app bundle via
+/// `open` (fire-and-forget, no real terminal needed), a formula is queued
+/// into `pending_launch` since running its CLI interactively needs the
+/// terminal back from ratatui.
+pub(super) fn launch_selected(app: &mut App) {
+    let Some(pkg) = app.selected_package() else {
+        return;
+    };
+    let name = pkg.package.name.clone();
+    match pkg.package.kind {
+        PackageKind::Cask => {
+            let version = pkg.package.version.clone();
+            match details::cask_app_path(&name, &version) {
+                Some(path) => match Command::new("open").arg(&path).status() {
+                    Ok(status) if status.success() => app.status = format!("Launched \"{name}\""),
+                    _ => app.status = format!("Failed to launch \"{name}\" (is `open` on PATH?)"),
+                },
+                None => app.status = format!("\"{name}\" has no app to launch"),
+            }
+        }
+        PackageKind::Formula => {
+            let version = pkg.package.version.clone();
+            let binaries = details::formula_binaries(&name, &version);
+            match details::pick_binary(&name, &binaries) {
+                Some(binary) => {
+                    app.pending_launch = details::formula_bin_dir(&name, &version)
+                        .map(|dir| dir.join(binary).to_string_lossy().into_owned())
+                }
+                None if binaries.is_empty() => {
+                    app.status = format!("\"{name}\" installs no executable to launch")
+                }
+                None => {
+                    app.status = format!(
+                        "\"{name}\" installs {} executables \u{2013} run one yourself: {}",
+                        binaries.len(),
+                        binaries.join(", ")
+                    )
+                }
+            }
+        }
     }
 }
 
