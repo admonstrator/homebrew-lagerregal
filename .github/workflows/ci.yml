@@ -68,8 +68,10 @@ jobs:
       - name: Tests
         run: cargo test --target ${{ matrix.target }}
 
+      # --locked here as well as in the release build: a Cargo.lock that no
+      # longer matches Cargo.toml should fail in CI, not when cutting a tag.
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       # Cheap smoke test: the binary should at least start and answer --help
       # without a Homebrew install present. Anything that actually shells out

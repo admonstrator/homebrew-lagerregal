@@ -15,7 +15,7 @@ brew tap admonstrator/tap
 brew install lagerregal
 ```
 
-The formula is generated and maintained in [`admonstrator/homebrew-tap`](https://github.com/admonstrator/homebrew-tap), the shared tap for everything I distribute via Homebrew. This repo's release workflow pushes the regenerated formula there on every tagged release.
+The formula is generated and maintained in [`admonstrator/homebrew-tap`](https://github.com/admonstrator/homebrew-tap), the shared tap for everything I distribute via Homebrew. This repo's release workflow pushes the regenerated formula there on every tagged release, together with the binaries it points at — like every other project in the tap, `brew` downloads from the tap itself.
 
 Or from source:
 
@@ -219,12 +219,15 @@ git push origin v0.1.0
 
 1. checks that the tag matches the version in `Cargo.toml`, failing loudly if it doesn't;
 2. builds all four target binaries — two macOS, two Linux — each on a runner of its own architecture, and packages each as a tarball;
-3. publishes a GitHub Release with all four tarballs attached;
-4. regenerates `Formula/lagerregal.rb` with the per-platform URLs and their SHA-256 sums, and pushes it to the `main` branch of [`admonstrator/homebrew-tap`](https://github.com/admonstrator/homebrew-tap).
+3. publishes a GitHub Release here with all four tarballs and their `.sha256` sidecars attached;
+4. publishes those same files to [`admonstrator/homebrew-tap`](https://github.com/admonstrator/homebrew-tap) as a `lagerregal-v*` release — the tap is what `brew` downloads from, so a formula's URL never depends on the state or visibility of its own source repo. Tap tags are project-prefixed because the tap holds releases for more than one project and a bare `v*` would collide;
+5. runs `scripts/update-tap.sh`, which regenerates `Formula/lagerregal.rb` with those URLs and their SHA-256 sums and pushes it to the tap's `main` branch.
+
+It can also be run from the Actions tab with a `tag` input: dispatch on a branch to cut a tag that doesn't exist yet, or on an existing tag to rebuild it.
 
 Checksums are taken in the release job rather than per build, so they all come from one `sha256sum` on one runner — `shasum` and `sha256sum` differ across the macOS and Linux images, and a formula is only as good as its hashes.
 
-Since the formula lives in a different repo, the built-in `GITHUB_TOKEN` (scoped to this repo only) isn't enough to push it. The workflow uses `GH_TAP_PAT`, a fine-grained Personal Access Token scoped to `contents: write` on `homebrew-tap` only, stored as a secret on this repo. The formula itself is generated, not hand-maintained; change the workflow rather than editing it in `homebrew-tap` directly.
+Since the formula lives in a different repo, the built-in `GITHUB_TOKEN` (scoped to this repo only) isn't enough to push it or to publish the tap release. Both steps use `GH_TAP_PAT`, a fine-grained Personal Access Token scoped to `contents: write` on `homebrew-tap` only, stored as a secret on this repo. The formula itself is generated, not hand-maintained; change `scripts/update-tap.sh` rather than editing it in `homebrew-tap` directly.
 
 ## License
 

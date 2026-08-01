@@ -3,6 +3,14 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: >-
+          Tag to release, e.g. v0.5.0. If it doesn't exist yet it is created at
+          the ref the workflow is dispatched on; dispatch on an existing tag to
+          (re)build that tag.
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -31,25 +39,34 @@ jobs:
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
     steps:
+      # Tag pushes check out the tag (github.ref). workflow_dispatch checks out
+      # the ref it was dispatched on — a branch when cutting a brand-new tag,
+      # or the tag itself when rebuilding an existing one.
       - uses: actions/checkout@v7
 
       - name: Derive version from tag
         id: version
+        # The tag arrives via env rather than inline ${{ }} so a dispatch input
+        # can't inject shell.
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Releasing $version"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${TAG#v}"
 
       # A tag whose version disagrees with Cargo.toml would ship a binary
       # that reports a different version than the formula installs. Catch it
       # here rather than after publishing - a failure in any matrix leg
       # leaves the release job with nothing to publish.
       - name: Verify tag matches Cargo.toml version
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           manifest="$(cargo metadata --no-deps --format-version 1 \
             | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
-          if [ "$manifest" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::error::tag ${{ github.ref_name }} does not match Cargo.toml version $manifest"
+          if [ "$manifest" != "$VERSION" ]; then
+            echo "::error::tag $TAG does not match Cargo.toml version $manifest"
             exit 1
           fi
 
@@ -57,12 +74,13 @@ jobs:
         run: rustup target add ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version="${{ steps.version.outputs.version }}"
-          archive="lagerregal-${version}-${{ matrix.target }}.tar.gz"
+          archive="lagerregal-${VERSION}-${{ matrix.target }}.tar.gz"
           tar -czf "$archive" -C "target/${{ matrix.target }}/release" lagerregal
 
       - uses: actions/upload-artifact@v7
@@ -73,19 +91,26 @@ jobs:
           retention-days: 1
 
   release:
+    name: publish release + update tap
     needs: build
     runs-on: ubuntu-latest
     permissions:
       # Only for creating the Release in this repo - GITHUB_TOKEN is enough
-      # for that. Pushing the regenerated formula to homebrew-tap is a
-      # separate repo, so that step uses the GH_TAP_PAT secret instead.
+      # for that. Publishing the binaries to homebrew-tap and pushing the
+      # regenerated formula there both target a different repo, so those two
+      # steps use the GH_TAP_PAT secret instead.
       contents: write
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      # The tap carries releases for several projects, so its tags are
+      # project-prefixed - a bare v* would collide with another project's.
+      TAP_TAG: lagerregal-${{ github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
 
       - name: Derive version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v8
         with:
@@ -95,27 +120,51 @@ jobs:
       # Checksums are taken here rather than per-target so they all come from
       # one tool on one runner - `shasum` vs `sha256sum` differ across the
       # macOS and Linux images, and a formula is only as good as its hashes.
+      # The sidecars ship with the release and are what update-tap.sh reads.
       - name: Checksum artifacts
-        id: sums
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version="${{ steps.version.outputs.version }}"
+          cd dist
           for target in aarch64-apple-darwin x86_64-apple-darwin \
                         aarch64-unknown-linux-musl x86_64-unknown-linux-musl; do
-            archive="dist/lagerregal-${version}-${target}.tar.gz"
+            archive="lagerregal-${VERSION}-${target}.tar.gz"
             if [ ! -f "$archive" ]; then
               echo "::error::missing build artifact $archive"
               exit 1
             fi
-            sha="$(sha256sum "$archive" | cut -d' ' -f1)"
-            echo "${target//-/_}=$sha" >> "$GITHUB_OUTPUT"
-            echo "$sha  $archive"
+            sha256sum "$archive" > "${archive}.sha256"
+            cat "${archive}.sha256"
           done
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          files: dist/*.tar.gz
+          tag_name: ${{ env.TAG }}
+          # Where a not-yet-existing tag is created (ignored for existing tags).
+          target_commitish: ${{ github.sha }}
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
           generate_release_notes: true
+
+      # The binaries Homebrew downloads live on the tap, next to every other
+      # project distributed from it, so a formula's URL never depends on the
+      # state (or visibility) of its own source repository.
+      - name: Publish binaries to the tap
+        uses: softprops/action-gh-release@v3
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-tap
+          token: ${{ secrets.GH_TAP_PAT }}
+          tag_name: ${{ env.TAP_TAG }}
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+          body: |
+            Prebuilt lagerregal ${{ steps.version.outputs.version }} binaries:
+            macOS Apple Silicon / Intel, Linux x86_64 / arm64 (static musl).
+
+            Install via `brew install ${{ github.repository_owner }}/tap/lagerregal`.
 
       # The formula lives in admonstrator/homebrew-tap, the shared tap for
       # every brew-distributed project, not in this repo. GITHUB_TOKEN only
@@ -125,60 +174,4 @@ jobs:
       - name: Update formula in homebrew-tap
         env:
           GH_TAP_PAT: ${{ secrets.GH_TAP_PAT }}
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
-
-          git clone "https://x-access-token:${GH_TAP_PAT}@github.com/admonstrator/homebrew-tap.git" tap
-          cd tap
-          mkdir -p Formula
-          cat > Formula/lagerregal.rb <<EOF
-          # Generated by .github/workflows/release.yml on every tagged release.
-          # Edits here are overwritten; change the workflow instead.
-          class Lagerregal < Formula
-            desc "Classify and browse your installed Homebrew packages by category"
-            homepage "https://github.com/${GITHUB_REPOSITORY}"
-            version "${version}"
-            license "MIT"
-
-            on_macos do
-              on_arm do
-                url "${base}/lagerregal-${version}-aarch64-apple-darwin.tar.gz"
-                sha256 "${{ steps.sums.outputs.aarch64_apple_darwin }}"
-              end
-              on_intel do
-                url "${base}/lagerregal-${version}-x86_64-apple-darwin.tar.gz"
-                sha256 "${{ steps.sums.outputs.x86_64_apple_darwin }}"
-              end
-            end
-
-            on_linux do
-              on_arm do
-                url "${base}/lagerregal-${version}-aarch64-unknown-linux-musl.tar.gz"
-                sha256 "${{ steps.sums.outputs.aarch64_unknown_linux_musl }}"
-              end
-              on_intel do
-                url "${base}/lagerregal-${version}-x86_64-unknown-linux-musl.tar.gz"
-                sha256 "${{ steps.sums.outputs.x86_64_unknown_linux_musl }}"
-              end
-            end
-
-            def install
-              bin.install "lagerregal"
-            end
-
-            test do
-              assert_match "lagerregal", shell_output("#{bin}/lagerregal --version")
-            end
-          end
-          EOF
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/lagerregal.rb
-          if git diff --staged --quiet; then
-            echo "Formula already up to date."
-          else
-            git commit -m "lagerregal ${version}"
-            git push origin main
-          fi
+        run: bash scripts/update-tap.sh
