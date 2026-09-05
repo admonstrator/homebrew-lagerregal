@@ -240,7 +240,9 @@ const CATEGORY_STYLES: &[(&str, &str, Color)] = &[
     ("Documents & PDF", "\u{f0f6}", LAVENDER),          // file-text
     ("Monitoring", "\u{f0e4}", TEAL),                   // dashboard
     ("Databases", "\u{f1c0}", SAPPHIRE),                // database
+    ("Virtualization", "\u{f233}", LAVENDER),           // server
     ("Cloud & Infra", "\u{f0c2}", MAROON),              // cloud
+    ("Version & Build Tools", "\u{f085}", TEAL),        // cogs
     ("Dev Tools & Languages", "\u{f121}", GREEN),       // code
     ("System Utilities", "\u{f0ad}", SUBTEXT),          // wrench
     ("Communication & Browsers", "\u{f086}", FLAMINGO), // comments
@@ -248,6 +250,7 @@ const CATEGORY_STYLES: &[(&str, &str, Color)] = &[
     ("Archives & Compression", "\u{f187}", PEACH),      // archive
     ("Peripherals & Input", "\u{f11c}", TEAL),          // keyboard
     ("Productivity", "\u{f046}", GREEN),                // check-square
+    ("Libraries", "\u{f02d}", SUBTEXT),                 // book
     ("Uncategorized", "\u{f128}", OVERLAY),             // question mark
 ];
 
@@ -293,7 +296,7 @@ mod tests {
     /// The built-in taxonomy, as `classify::known_categories()` reports it.
     /// Kept as a literal here so a drift between the two shows up as a test
     /// failure rather than as silently un-iconified categories in the UI.
-    const BUILT_IN: [&str; 20] = [
+    const BUILT_IN: [&str; 23] = [
         "Security",
         "AI & Machine Learning",
         "DNS",
@@ -305,7 +308,9 @@ mod tests {
         "Documents & PDF",
         "Monitoring",
         "Databases",
+        "Virtualization",
         "Cloud & Infra",
+        "Version & Build Tools",
         "Dev Tools & Languages",
         "System Utilities",
         "Communication & Browsers",
@@ -313,6 +318,7 @@ mod tests {
         "Archives & Compression",
         "Peripherals & Input",
         "Productivity",
+        "Libraries",
         "Uncategorized",
     ];
 

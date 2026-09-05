@@ -94,6 +94,7 @@ massdns = "DNS"
 quien = "DNS"
 
 # --- Cryptography ---
+nss = "Cryptography"
 openssl = "Cryptography"
 "openssl@3" = "Cryptography"
 libressl = "Cryptography"
@@ -126,6 +127,8 @@ mariadb = "Databases"
 influxdb = "Databases"
 
 # --- Cloud & Infra ---
+temporal = "Cloud & Infra"
+jfrog-cli = "Cloud & Infra"
 terraform = "Cloud & Infra"
 awscli = "Cloud & Infra"
 kubectl = "Cloud & Infra"
@@ -145,6 +148,18 @@ lazydocker = "Cloud & Infra"
 parallels = "Cloud & Infra"
 
 # --- Dev Tools & Languages ---
+vim = "Dev Tools & Languages"
+guile = "Dev Tools & Languages"
+nasm = "Dev Tools & Languages"
+lld = "Dev Tools & Languages"
+pgadmin4 = "Dev Tools & Languages"
+graphviz = "Dev Tools & Languages"
+swiftgen = "Dev Tools & Languages"
+sourcery = "Dev Tools & Languages"
+the_silver_searcher = "Dev Tools & Languages"
+gdal = "Dev Tools & Languages"
+k6 = "Dev Tools & Languages"
+unixodbc = "Dev Tools & Languages"
 git = "Dev Tools & Languages"
 node = "Dev Tools & Languages"
 "python@3.12" = "Dev Tools & Languages"
@@ -178,6 +193,8 @@ chrome-cli = "Dev Tools & Languages"
 mas = "Dev Tools & Languages"
 
 # --- AI & Machine Learning ---
+cursor = "AI & Machine Learning"
+numpy = "AI & Machine Learning"
 apfel = "AI & Machine Learning"
 hf = "AI & Machine Learning"
 "llama.cpp" = "AI & Machine Learning"
@@ -188,6 +205,9 @@ upscayl = "AI & Machine Learning"
 whisper-cpp = "AI & Machine Learning"
 
 # --- Media & Graphics ---
+figma = "Media & Graphics"
+libheif = "Media & Graphics"
+libtiff = "Media & Graphics"
 affinity = "Media & Graphics"
 audacity = "Media & Graphics"
 cdrtools = "Media & Graphics"
@@ -223,6 +243,20 @@ tesseract-lang = "Documents & PDF"
 archivewebpage = "Documents & PDF"
 
 # --- System Utilities ---
+lagerregal = "System Utilities"
+fastfetch = "System Utilities"
+neofetch = "System Utilities"
+hammerspoon = "System Utilities"
+moreutils = "System Utilities"
+watch = "System Utilities"
+dos2unix = "System Utilities"
+rsync = "System Utilities"
+syncthing = "System Utilities"
+localsend = "System Utilities"
+scrcpy = "System Utilities"
+squashfs = "System Utilities"
+libimobiledevice = "System Utilities"
+libusb = "System Utilities"
 balenaetcher = "System Utilities"
 betterdisplay = "System Utilities"
 cleanmymac-cli = "System Utilities"
@@ -243,6 +277,9 @@ testdisk = "System Utilities"
 witr = "System Utilities"
 
 # --- Communication & Browsers ---
+zoom = "Communication & Browsers"
+signal = "Communication & Browsers"
+telegram = "Communication & Browsers"
 discord = "Communication & Browsers"
 emclient = "Communication & Browsers"
 google-chrome = "Communication & Browsers"
@@ -259,6 +296,15 @@ wimlib = "Archives & Compression"
 snappy = "Archives & Compression"
 
 # --- Productivity ---
+bash = "Productivity"
+zsh = "Productivity"
+nushell = "Productivity"
+powershell = "Productivity"
+gnu-sed = "Productivity"
+gawk = "Productivity"
+raycast = "Productivity"
+shellcheck = "Productivity"
+shfmt = "Productivity"
 tmux = "Productivity"
 tree = "Productivity"
 bat = "Productivity"
@@ -270,16 +316,81 @@ calcurse = "Productivity"
 maccy = "Productivity"
 tlrc = "Productivity"
 
+# --- Version & Build Tools ---
+tfenv = "Version & Build Tools"
+just = "Version & Build Tools"
+libtool = "Version & Build Tools"
+pkg-config = "Version & Build Tools"
+ccache = "Version & Build Tools"
+poetry = "Version & Build Tools"
+npm = "Version & Build Tools"
+xcodes = "Version & Build Tools"
+topgrade = "Version & Build Tools"
+docker-buildx = "Version & Build Tools"
+
+# --- Virtualization ---
+orbstack = "Virtualization"
+virtualbox = "Virtualization"
+vagrant = "Virtualization"
+multipass = "Virtualization"
+vmware-fusion = "Virtualization"
+crossover = "Virtualization"
+
 # Evaluated top to bottom; the first category whose keyword appears in a
-# package's `desc` wins. More specific categories are listed before more
-# generic ones (e.g. Security/DNS before the catch-all Productivity).
+# package's name + `desc` wins. More specific categories are listed before
+# more generic ones, and three "catch-all-ish" categories are deliberately
+# placed late: Games & Emulation (after Virtualization, so a machine
+# emulator/virtualizer isn't a game), Productivity (the terminal/workflow
+# bucket), and Libraries (a fallback just above Uncategorized - "library"
+# matches thousands of formulae, so it must only see what nothing else
+# claimed).
+#
+# Keyword design notes:
+#   * Keywords of <=4 chars must start at a word boundary (see
+#     BOUNDARY_REQUIRED_UP_TO in classify.rs), but may still grow to the
+#     right - which is why "tex" is NOT a keyword here: it would match
+#     "text editor". Spell such stems out ("latex", "texlive") instead.
+#   * Wrapping a short word in spaces (" ai ", " ide ") makes it exact:
+#     the leading space is not alphanumeric, so the boundary rule is
+#     skipped and the trailing space blocks "identifier"/"aim".
+
 [[heuristic]]
 category = "Security"
-keywords = ["security", "exploit", "vulnerab", "penetration", "malware", "antivirus", "password crack", "password manager", "forensic", "intrusion", "brute force", "reverse engineer", "privacy"]
+keywords = [
+  "security", "exploit", "vulnerab", "penetration", "malware", "antivirus",
+  "password crack", "password manager", "password vault", "login vault",
+  "forensic", "intrusion", "brute force", "reverse engineer", "privacy",
+  "rootkit", "keylogg", "phishing", "two-factor", "one-time password",
+  "totp", "yubikey", "hardening", "secrets", "cve ", "sandbox escape",
+  "credentials", "audit tool", "threat",
+]
+# A privacy-focused *browser* is a browser; a TLS/crypto library belongs
+# under Cryptography. Both used to be swallowed by "privacy"/"security".
+exclude = [
+  "web browser", "browser focus", "fork of firefox", "chromium",
+  "transport layer security", "security-enabled",
+]
 
 [[heuristic]]
 category = "AI & Machine Learning"
-keywords = ["machine learning", "language model", " llm", "artificial intelligence", "neural network", "generative ai", "openai", "computer vision"]
+keywords = [
+  "machine learning", "language model", " llm", "llm ", "artificial intelligence",
+  "neural network", "generative ai", "openai", "computer vision", "deep learning",
+  # The current generation of CLI/desktop AI tooling describes itself as
+  # "AI <something>" or by vendor name, none of which the older keywords
+  # above catch - claude-code, codex, gemini-cli and friends all used to
+  # land in Productivity ("terminal") or Uncategorized.
+  " ai ", "ai-powered", "ai coding", "ai agent", "ai assistant", "ai model",
+  "ai chat", "ai desktop", "coding agent", "coding assistant",
+  "chatgpt", "anthropic", "claude", "copilot", "gemini-cli", "google gemini",
+  "ollama", "llama", "hugging face", "huggingface", "transformers",
+  "inference", "embeddings", "stable diffusion", "text-to-speech",
+  "speech recognition", "speech-to-text", "tensorflow", "pytorch",
+  "model context protocol", "prompt engineering",
+]
+# "gemini" is also an internet protocol with its own browsers/servers, and
+# "claude"/"llama" can show up as a font or an animal package name.
+exclude = ["gemini protocol", "gemini client", "gemini server", "font-"]
 
 [[heuristic]]
 category = "DNS"
@@ -292,6 +403,9 @@ keywords = [
   # Short keywords above now require a word boundary, so the compounds
   # they used to catch mid-word need naming explicitly.
   "openssl", "libressl", "openpgp", "gnupg",
+  "transport layer security", "public key", "private key", "x.509",
+  "pkcs", "cipher", "keychain", "digital signature", "signing key",
+  "secret management", "hashing algorithm", "key derivation",
 ]
 
 [[heuristic]]
@@ -300,54 +414,178 @@ keywords = ["cryptocurrency", "cryptocurrencies", "crypto wallet", "hardware wal
 
 [[heuristic]]
 category = "Networking"
-keywords = ["network", "packet", "firewall", "vpn", "proxy", "tunnel", "load balanc", "bandwidth", "traffic analy", "port scan"]
-
-[[heuristic]]
-category = "Media & Graphics"
-keywords = ["video", "audio codec", "audio editor", "image editing", "image manipulat", "screen record", "transcod", "photo editing", "screenshot", "music"]
-# "video" is a strong signal for media tools, but a videogame is a game.
-exclude = ["videogame", "video game"]
+keywords = [
+  "network", "packet", "firewall", "vpn", "proxy", "tunnel", "load balanc",
+  "bandwidth", "traffic analy", "port scan",
+  "http server", "web server", "http/", "https ", "ssh ", " ssh", "sftp",
+  "ftp ", "socket", "tcp", "udp", "quic ", "rsync", "file transfer",
+  "wifi", "wi-fi", "ip address", "port forward", "mesh network", "airdrop",
+  "download manager", "reverse tunnel", "curl", "file synchronization",
+  "file sync", "serial client", "remote desktop", "web scrap",
+  "bittorrent", "torrent", "link checker",
+]
+# "rsync"/"ssh" are strong networking signals but appear in tools that are
+# really about something else: rclone ("Rsync for cloud storage") is cloud
+# storage, tabby ("Terminal emulator, SSH and serial client") is a terminal.
+exclude = ["cloud storage", "terminal emulat", "terminal-emulat"]
 
 [[heuristic]]
 category = "Fonts"
 # Matched against name+desc together: most `font-*` casks (there are
 # thousands) ship with no `desc` at all, only a name that starts with
 # "font-", so the "font-" keyword below matches on the name instead.
-keywords = ["font-", "typeface", "font family"]
+# Listed above Media & Graphics so font *rendering/shaping* libraries
+# (freetype, harfbuzz, fontconfig) file as Fonts rather than as graphics.
+keywords = [
+  "font-", "typeface", "font family", "font editor", "render fonts",
+  "font render", "text shaping", "opentype", "truetype", "font config",
+  "fontconfig", "glyph",
+]
+
+[[heuristic]]
+category = "Media & Graphics"
+keywords = [
+  "video", "audio codec", "audio editor", "image editing", "image manipulat",
+  "screen record", "transcod", "photo editing", "screenshot", "music",
+  # Image *formats* used to fall through to Archives & Compression on the
+  # word "compression" - they are graphics, not archivers.
+  "image format", "image compression", "image processing", "image loading",
+  "media player", "multimedia", "audio player", "audio driver", "codec",
+  "vector graphics", "graphics library", "graphics editor", "3d creation",
+  "3d modeling", "rendering", "raster", "color management", "icc profile",
+  "animation", "subtitle", "webcam", "camera", "photo", "png", "jpeg",
+  "svg", "gif ", "audio streams", "sound", "image editor", "image file format",
+  "graph visualization", "data visualization", "exif", "high dynamic-range",
+  "colour", "wallpaper", "video encoder", "drawing", "3d modell", "3d cad",
+  "cad modell", "barcode", "speech synthes", "matroska", "media files",
+  "plotting", "solid modell", "decoder", "encoder", "mp3", "av1",
+]
+# "video" is a strong signal for media tools, but a videogame is a game.
+exclude = ["videogame", "video game", "video conferenc", "video call", "video meeting"]
 
 [[heuristic]]
 category = "Documents & PDF"
-keywords = ["pdf", "document editor", "markdown", "word processing", "note-taking", "knowledge base", "ocr", "optical character recognition"]
+keywords = [
+  "pdf", "document editor", "markdown", "word processing", "note-taking",
+  "note taking", "knowledge base", "ocr", "optical character recognition",
+  "latex", "texlive", "tex live", "tex distribution", "typesetting",
+  "epub", "ebook", "spreadsheet", "office suite", "presentation",
+  "postscript", "diagram software", "wiki", "bibliograph", "e-book", "e-books",
+  "text formats", "manual page",
+]
 
 [[heuristic]]
 category = "Monitoring"
-keywords = ["monitor", "metrics", "observability", "log aggregat", "dashboard", "telemetry"]
+keywords = ["monitor", "metrics", "observability", "log aggregat", "dashboard", "telemetry", "profiler", "profiling", "benchmark", "load testing", "tracing", "uptime", "alerting"]
 
 [[heuristic]]
 category = "Databases"
-keywords = ["database", " sql", "key-value store", "document store", "time series"]
+keywords = [
+  "database", " sql", "key-value store", "document store", "time series",
+  "postgres", "mysql", "mariadb", "sqlite", "redis", "mongodb", "rdbms",
+  "relational", "data warehouse", "columnar", "query engine", "olap",
+  "odbc", "jdbc", "migrations",
+]
+
+[[heuristic]]
+category = "Virtualization"
+# Above both Cloud & Infra and Games & Emulation on purpose: qemu
+# ("Generic machine emulator and virtualizer") is a hypervisor, not a
+# console emulator, and lima/colima/utm are VMs before they are cloud.
+keywords = [
+  "virtual machine", "virtualization", "virtualisation", "hypervisor",
+  "vm ", " vms", "qemu", "wine", "windows applications", "windows software",
+  "compatibility layer to run", "run windows",
+  "emulator and virtualizer", "guest os", "linux vm",
+]
 
 [[heuristic]]
 category = "Cloud & Infra"
-keywords = ["cloud", "kubernetes", "container", "infrastructure as code", "orchestrat", "provisioning", "virtual machine", "virtualization"]
+keywords = [
+  "cloud", "kubernetes", "container", "infrastructure as code", "orchestrat",
+  "provisioning", "k8s", "aws", "azure", "google cloud", "gcp ", "serverless",
+  "terraform", "helm chart", "continuous delivery", "continuous integration",
+  "ci/cd", "gitops", "oci registry", "object storage", "deploy",
+  "docker", "podman", "kubectl", "openshift", "digitalocean", "firebase",
+  "fly.io", "heroku", "cloudflare", "storage service", "microservice",
+  "message broker", "event streaming", "mqtt", "remote images", "registries",
+  "amazon eks", "istio", "service mesh", "amazon s3", "amazon web",
+  "s3 service", "blob storage",
+]
+
+[[heuristic]]
+category = "Version & Build Tools"
+# Ahead of Dev Tools & Languages: version/build/dependency managers are a
+# large, coherent family that would otherwise swell that category and lose
+# its own shape (mise, pyenv, nvm, asdf, maven, gradle, just, automake ...).
+keywords = [
+  "version manager", "version management", "manage multiple", "runtime manager",
+  "install various", "build system", "build automation", "build tool",
+  "task runner", "package manager", "dependency manager", "dependency management",
+  "makefile", "make files", "configure script", "toolchain", "cross-compil",
+  "project management", "monorepo", "release automation", "artifact repository",
+  "code generator", "boilerplate", "scaffold", "cmake", "compilation",
+  "pre-commit", "conda", "pyenv", "virtualenv", "build and release",
+  "bundler", "linker", "assembler", "directing compilation",
+  "dependency updates", "package management", "tools manager", "release binaries",
+]
 
 [[heuristic]]
 category = "Dev Tools & Languages"
-keywords = ["compiler", "programming language", "interpreter", "build system", "version control", "package manager", "linter", "git", "language server"]
+keywords = [
+  "compiler", "programming language", "interpreter", "version control",
+  "linter", "lint ", "formatter", "code format", "static analysis",
+  "git", "language server", "debugger", " ide ", "ide for", "code editor",
+  "sdk", "jdk", "java", "python", "javascript", "typescript", "scripting language",
+  "runtime environment", "api development", "api client", "rest client",
+  "unit test", "test report", "testing system", "code coverage",
+  "parser", "regular expression", "json", "yaml", "xml", "protocol buffers",
+  "grpc", "rpc ", "developer platform", "swift", "xcode", "android",
+  "lint", "linting", "coverage", "spell check", "source code", "code search",
+  "lines of code", "automated testing", "license header", "static site",
+  "watch files", "environment variables", "template processor", "templating",
+  "ui toolkit", "ui framework", "gui toolkit", "application framework",
+  "openjdk", "dotnet", ".net core", "scheme language", "erlang", "ocaml",
+  "haskell", "elixir", "command language", "extension language", "metaprogramming",
+  "binary tools", "notebook", "jupyter", "sourcekit", "stream editor",
+  "awk", "sed ", "shell script", "uml", "visual diff", "diff tool",
+  "merge tool", "mocking framework", "testing framework", "openapi",
+  "documentation", "graphical user interface", "scripting interface",
+  "text processing", "man pages", "code review", "statistical computing",
+]
+
+[[heuristic]]
+category = "Archives & Compression"
+keywords = ["compress", "decompress", "archive utility", "archive manager", "archive format", "archiving tool", "archiv", " zip ", "unzip", "extract files", "tar file", "gzip", "lossless compress"]
 
 [[heuristic]]
 category = "System Utilities"
-keywords = ["clean up", "cleaner", "uninstall", "disk usage", "disk space", "window manager", "clipboard manager", "bootable", "data recovery", "menu bar app"]
+keywords = [
+  "clean up", "cleaner", "uninstall", "disk usage", "disk space",
+  "window manager", "clipboard manager", "bootable", "data recovery",
+  "menu bar app", "menu bar", "file system integration", "disk image",
+  "partition", "mount ", "backup", "dotfiles", "system information",
+  "battery", "power management", "process manager", "resize windows",
+  "sandboxing", "ntfs", "microsd", "imaging utility", "directory tree",
+  "prevents the system", "stress test",
+  "window", "launcher", "trash",
+]
 
 [[heuristic]]
 category = "Communication & Browsers"
-keywords = ["web browser", "chat", "video call", "email client", "messaging app"]
+keywords = [
+  "web browser", "browser", "chat", "video call", "video conferenc",
+  "video meeting", "email client", "mail client", "messaging app",
+  "team communication", "instant messag", "irc", "matrix client",
+  "rss", "voip", "newsreader",
+]
 
 [[heuristic]]
 category = "Games & Emulation"
-keywords = ["game", "emulat", "gaming", "videogame", "video game", "wargam"]
+keywords = ["game", "emulat", "gaming", "videogame", "video game", "wargam", "retro", "nintendo", "playstation", "roguelike", "arcade", "chess"]
 # "emulat" is the useful stem for game emulators, but plenty of software
 # emulates something that has nothing to do with games. These veto it.
+# (Machine/OS emulators are caught earlier by Virtualization.)
 exclude = [
   "terminal emulat",
   "terminal-emulat",
@@ -361,13 +599,36 @@ exclude = [
 ]
 
 [[heuristic]]
-category = "Archives & Compression"
-keywords = ["compress", "decompress", "archive utility", "archive manager", "archive format", "archiving tool", "archiv", " zip ", "unzip", "extract files", "tar file", "gzip", "lossless compress"]
-
-[[heuristic]]
 category = "Peripherals & Input"
-keywords = ["keyboard", "trackpad", "touchpad", "mouse", "gesture", "input device", "game controller", "gamepad", "joystick"]
+keywords = ["keyboard", "trackpad", "touchpad", "mouse", "gesture", "input device", "game controller", "gamepad", "joystick", "usb device", "bluetooth", "printer", "scanner ", "logitech", "midi", "controller"]
+# A window mover driven *by* keyboard shortcuts is a window tool, not a
+# keyboard tool - System Utilities above already claims those.
+exclude = ["keyboard shortcut", "resize windows"]
 
 [[heuristic]]
 category = "Productivity"
-keywords = ["terminal", "shell", "file manager", "text editor", "file retriever", "personal organizer", "file archiver"]
+keywords = [
+  "terminal", "shell", "file manager", "text editor", "file retriever",
+  "personal organizer", "file archiver", "fuzzy finder", "multiplexer",
+  "todo", "task management", "calendar", "time tracking", "productivity",
+  "snippet", "clipboard", "cheat sheet", "pager", "workflow", "automation",
+  "coreutils", "findutils", "collection of tools", "convert text", "zsh",
+  "fish-like", "autosuggestion", "qr code", "bookmark", "search tool",
+]
+
+[[heuristic]]
+category = "Libraries"
+# Deliberately last before Uncategorized. "library" matches well over a
+# thousand formulae, almost all of them dependency-only - which is exactly
+# why it must run after every category that has something specific to say
+# about what the library is *for* (a graphics library is Media & Graphics,
+# a DNS library is DNS). What is left here is the generic C/system
+# plumbing: glib, libffi, boost, gettext, libtool.
+keywords = [
+  "library", "libraries", "bindings", "header files", "shared object",
+  "abi ", "foreign function", "abstractions framework", "perl lib",
+  # Very common shapes for a library that never says the word: "portable
+  # implementation of <spec>", "<language> port of <thing>", "framework
+  # for <x>". Safe only because Libraries runs last.
+  "implementation of", "port of", "framework", "routines", "simd", "malloc",
+]
