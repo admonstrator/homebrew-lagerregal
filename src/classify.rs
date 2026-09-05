@@ -292,6 +292,164 @@ mod tests {
     }
 
     #[test]
+    fn ai_tooling_is_recognised_as_ai_not_as_a_terminal_app() {
+        // The current generation of AI CLIs describe themselves as "AI
+        // <something>" rather than with any of the older ML vocabulary, so
+        // they used to fall through to Productivity on the word "terminal".
+        for (name, desc) in [
+            ("claude-code", "Terminal-based AI coding assistant"),
+            ("opencode", "AI coding agent, built for the terminal"),
+            ("codex", "OpenAI's coding agent that runs in your terminal"),
+            (
+                "gemini-cli",
+                "Interact with Google Gemini AI models from the command-line",
+            ),
+        ] {
+            let (cat, _) = classify(name, desc, None);
+            assert_eq!(cat, "AI & Machine Learning", "{name} should be AI tooling");
+        }
+    }
+
+    #[test]
+    fn gemini_the_protocol_is_not_gemini_the_model() {
+        // "gemini" names both an AI model family and an internet protocol
+        // with its own browsers and servers.
+        let (cat, _) = classify(
+            "amfora",
+            "Fancy terminal browser for the Gemini protocol",
+            None,
+        );
+        assert_ne!(cat, "AI & Machine Learning");
+    }
+
+    #[test]
+    fn machine_emulators_are_virtualization_rather_than_games() {
+        // Virtualization is listed above Games & Emulation precisely so
+        // that "emulator" in a hypervisor's description doesn't win.
+        for (name, desc) in [
+            ("qemu", "Generic machine emulator and virtualizer"),
+            ("lima", "Linux virtual machines"),
+            (
+                "wine-stable",
+                "Compatibility layer to run Windows applications",
+            ),
+        ] {
+            let (cat, _) = classify(name, desc, None);
+            assert_eq!(cat, "Virtualization", "{name} should be virtualization");
+        }
+
+        // ... while a console emulator still is a game emulator.
+        let (cat, _) = classify("fceux", "All-in-one NES/Famicom Emulator", None);
+        assert_eq!(cat, "Games & Emulation");
+    }
+
+    #[test]
+    fn image_formats_are_graphics_not_archives() {
+        // Both descriptions contain "compression", which used to file them
+        // under Archives & Compression; Media & Graphics now runs first.
+        for (name, desc) in [
+            (
+                "webp",
+                "Image format providing lossless and lossy compression for web images",
+            ),
+            ("jpeg-xl", "New file format for still image compression"),
+        ] {
+            let (cat, _) = classify(name, desc, None);
+            assert_eq!(cat, "Media & Graphics", "{name} should be graphics");
+        }
+
+        // The general-purpose compressors stay where they were.
+        let (cat, _) = classify(
+            "zstd",
+            "Zstandard is a real-time compression algorithm",
+            None,
+        );
+        assert_eq!(cat, "Archives & Compression");
+    }
+
+    #[test]
+    fn version_and_build_tooling_is_split_out_from_dev_tools() {
+        for (name, desc) in [
+            ("pyenv", "Python version management"),
+            ("nvm", "Manage multiple Node.js versions"),
+            (
+                "gradle",
+                "Open-source build automation tool based on the Groovy and Kotlin DSL",
+            ),
+            ("pnpm", "Fast, disk space efficient package manager"),
+        ] {
+            let (cat, _) = classify(name, desc, None);
+            assert_eq!(
+                cat, "Version & Build Tools",
+                "{name} should be a build tool"
+            );
+        }
+
+        // A compiler or a language is still Dev Tools & Languages.
+        let (cat, _) = classify("gcc", "GNU compiler collection", None);
+        assert_eq!(cat, "Dev Tools & Languages");
+    }
+
+    #[test]
+    fn libraries_only_catch_what_no_other_category_claimed() {
+        // Libraries is the last heuristic before Uncategorized, so generic
+        // C plumbing lands there ...
+        for (name, desc) in [
+            ("glib", "Core application library for C"),
+            ("libffi", "Portable Foreign Function Interface library"),
+        ] {
+            let (cat, _) = classify(name, desc, None);
+            assert_eq!(cat, "Libraries", "{name} should be a library");
+        }
+
+        // ... but a library that is *about* something keeps that something.
+        let (cat, _) = classify("c-ares", "Asynchronous DNS library", None);
+        assert_eq!(cat, "DNS");
+        let (cat, _) = classify("gnutls", "GNU Transport Layer Security (TLS) Library", None);
+        assert_eq!(cat, "Cryptography");
+    }
+
+    #[test]
+    fn privacy_focused_browsers_are_browsers_not_security_tools() {
+        // "privacy" is a Security keyword, and every hardened browser's
+        // description leads with it.
+        for (name, desc) in [
+            ("brave-browser", "Web browser focusing on privacy"),
+            ("tor-browser", "Web browser focusing on security"),
+        ] {
+            let (cat, _) = classify(name, desc, None);
+            assert_eq!(
+                cat, "Communication & Browsers",
+                "{name} should be a browser"
+            );
+        }
+    }
+
+    #[test]
+    fn short_keyword_stems_do_not_swallow_longer_words() {
+        // Guards the trap the boundary rule alone does not close: keywords
+        // may grow to the right, so "tex" would match "text editor". The
+        // taxonomy spells out "latex"/"texlive" instead - if someone ever
+        // adds a bare "tex", this fails.
+        let (cat, _) = classify(
+            "micro",
+            "Modern and intuitive terminal-based text editor",
+            None,
+        );
+        assert_ne!(cat, "Documents & PDF");
+
+        // Same shape: " ai " must not match "aim" or "said".
+        let (cat, _) = classify("aichat", "All-in-one LLM CLI tool", None);
+        assert_eq!(cat, "AI & Machine Learning");
+        let (cat, _) = classify(
+            "chafa",
+            "Versatile and fast Unicode/ASCII/ANSI graphics renderer",
+            None,
+        );
+        assert_ne!(cat, "AI & Machine Learning");
+    }
+
+    #[test]
     fn manual_override_wins_over_curated() {
         let (cat, source) = classify("nmap", "Port scanning utility", Some("Security"));
         assert_eq!(cat, "Security");
